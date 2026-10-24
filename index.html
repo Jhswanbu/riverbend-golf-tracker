@@ -673,9 +673,11 @@ function App() {
       if (fnErr) throw new Error('Scan failed - are you signed in?');
       if (!parsed) throw new Error('The scan service returned nothing');
       if (parsed.error) throw new Error(parsed.error);
-      const rows = (parsed.rows || []).map(r => {
+      const rawRows = parsed.rows || [];
+      const usedPids = new Set(rawRows.map(r => r.playerId).filter(id => id != null && targets.some(t => t.id === id)));
+      const rows = rawRows.map(r => {
         let pid = (r.playerId != null && targets.some(t => t.id === r.playerId)) ? r.playerId : '';
-        if (!pid && r.name) { const rn = String(r.name).toLowerCase(); const m = targets.find(t => t.name.toLowerCase() === rn) || targets.find(t => t.name.toLowerCase().startsWith(rn) || rn.startsWith(t.name.toLowerCase().split(' ')[0])); if (m) pid = m.id; }
+        if (!pid && r.name) { const rn = String(r.name).toLowerCase(); const free = targets.filter(t => !usedPids.has(t.id)); const m = free.find(t => t.name.toLowerCase() === rn) || free.find(t => t.name.toLowerCase().startsWith(rn) || rn.startsWith(t.name.toLowerCase().split(' ')[0])); if (m) { pid = m.id; usedPids.add(m.id); } }
         return { playerId: pid, name: r.name || '', scores: Array.from({ length: 18 }, (_, i) => { const v = (r.scores || [])[i]; return (typeof v === 'number' && v >= 1 && v <= 20) ? v : null; }), unsure: r.unsure || [], out: (r.out === undefined ? null : r.out), in: (r.in === undefined ? null : r.in), tot: (r.tot === undefined ? null : r.tot) };
       });
       if (!rows.length) throw new Error('No player rows could be read from that photo');
@@ -686,6 +688,8 @@ function App() {
 
   const applyScan = () => {
     if (!scanReview) return;
+    const ids = scanReview.rows.map(r => r.playerId).filter(Boolean);
+    if (ids.some((v, i) => ids.indexOf(v) !== i)) { flash('Two rows are assigned to the same player - fix before applying'); return; }
     setScores(prev => {
       const next = { ...prev };
       scanReview.rows.forEach(r => {
@@ -1126,6 +1130,7 @@ function App() {
               </div>
             ))}
           </div>
+          {(() => { const ids = scanReview.rows.map(r => r.playerId).filter(Boolean); return ids.some((v, i) => ids.indexOf(v) !== i) ? <div className="text-sm text-red-600 font-semibold mt-3">Two rows are assigned to the same player - fix the assignments before applying.</div> : null; })()}
           <button onClick={applyScan} className="btn w-full mt-4 bg-fairway-700 text-white rounded-xl py-3 font-bold">Apply scores</button>
           <button onClick={() => setScanReview(null)} className="btn w-full mt-2 bg-gray-100 rounded-xl py-2.5 text-sm font-semibold">Cancel</button>
         </Modal>
