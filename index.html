@@ -564,7 +564,7 @@ function App() {
   };
   const prevPhaseRef = useRef(phase);
   useEffect(() => {
-    if (!session || isAdminUser) { prevPhaseRef.current = phase; return; }
+    if (!session || isAdminUser) { prevPhaseRef.current = phase; if (isAdminUser && (view === 'waiting' || view === 'money')) setView('setup'); return; }
     if (phase === 'live' && (view === 'waiting' || view === 'setup' || view === 'teams')) {
       if (prevPhaseRef.current !== 'live') flash("Teams are set \u2014 you're in!");
       if (myGroupIdx >= 0) setActiveGroup(myGroupIdx);
@@ -1309,7 +1309,7 @@ function App() {
   const MoneyView = () => {
     if (session && myPlayerId == null) return (<div className="space-y-4">{NoLinkCard()}</div>);
     const mine = players.find(p => p.id === myPlayerId);
-    const m = myPlayerId != null ? (calcMoney(18).money[myPlayerId] || 0) : 0;
+    const m = myPlayerId != null ? (calcMoney(18)[myPlayerId] || 0) : 0;
     let through = 0;
     for (let i = 0; i < 18; i++) { if (allTeamPlayers.some(p => sc(p.id, i) !== null)) through = i + 1; }
     const teamLabel = mine ? (teams.team1.some(p => p.id === mine.id) ? 'Team 1' : teams.team2.some(p => p.id === mine.id) ? 'Team 2' : '') : '';
