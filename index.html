@@ -18,6 +18,19 @@ tailwind.config = { theme: { extend: { colors: { fairway: { 50:'#f0fdf4',100:'#d
   body { margin:0; background:#f3f1ea; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
   .hero { background: radial-gradient(circle at 20% 0%, rgba(255,255,255,.12), transparent 40%), linear-gradient(135deg,#14532d 0%,#166534 55%,#15803d 100%); }
   .banner-photo { background: linear-gradient(rgba(4,32,18,.52), rgba(4,32,18,.30)), url('banner.jpg') center / cover no-repeat; }
+  @keyframes rb-waggle { 0%,100% { transform: rotate(-7deg); } 50% { transform: rotate(10deg); } }
+  @keyframes rb-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(1.5px); } }
+  @keyframes rb-drift { from { transform: translateX(-10px); } to { transform: translateX(16px); } }
+  @keyframes rb-flag { 0%,100% { transform: skewY(0deg); } 50% { transform: skewY(-7deg); } }
+  @keyframes rb-sun { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+  @keyframes rb-blink { 0%, 88%, 100% { opacity: .25; } 94% { opacity: 1; } }
+  .rb-waggle { animation: rb-waggle 1.7s ease-in-out infinite; }
+  .rb-bob { animation: rb-bob 1.7s ease-in-out infinite; }
+  .rb-cloud { animation: rb-drift 8s ease-in-out infinite alternate; }
+  .rb-cloud2 { animation: rb-drift 11s ease-in-out infinite alternate-reverse; }
+  .rb-flag { animation: rb-flag 2.4s ease-in-out infinite; }
+  .rb-sun { animation: rb-sun 5s ease-in-out infinite; }
+  .rb-dot { animation: rb-blink 2.4s ease-in-out infinite; }
   .card { background:#fff; border-radius:1rem; box-shadow:0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(20,83,45,.06); }
   .btn { transition: transform .08s, background .15s; } .btn:active { transform: scale(.96); }
   .pb { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
@@ -161,6 +174,55 @@ function Toggle({ checked, onChange, title, sub }) {
   );
 }
 
+function WaitingGolfer() {
+  return (
+    <svg viewBox="0 0 320 180" className="w-full max-w-sm mx-auto" role="img" aria-label="Cartoon golfer waiting to tee off">
+      <defs>
+        <linearGradient id="wg-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#bae6fd" /><stop offset="100%" stopColor="#e0f2fe" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="320" height="180" fill="url(#wg-sky)" />
+      <g className="rb-sun" style={{ transformOrigin: '272px 34px' }}>
+        <circle cx="272" cy="34" r="20" fill="#fbbf24" opacity="0.25" />
+        <circle cx="272" cy="34" r="14" fill="#fbbf24" />
+      </g>
+      <g className="rb-cloud" fill="#ffffff" opacity="0.95">
+        <ellipse cx="60" cy="30" rx="22" ry="8" /><ellipse cx="77" cy="25" rx="15" ry="7" />
+      </g>
+      <g className="rb-cloud2" fill="#ffffff" opacity="0.85">
+        <ellipse cx="180" cy="18" rx="18" ry="6" /><ellipse cx="192" cy="14" rx="12" ry="5" />
+      </g>
+      <path d="M0 118 Q 80 96 170 112 T 320 106 V180 H0 Z" fill="#4ade80" />
+      <path d="M0 140 Q 90 124 200 136 T 320 132 V180 H0 Z" fill="#22c55e" />
+      <line x1="256" y1="128" x2="256" y2="86" stroke="#9ca3af" strokeWidth="2.5" />
+      <g className="rb-flag" style={{ transformOrigin: '256px 88px' }}>
+        <path d="M256 86 L282 93 L256 101 Z" fill="#ef4444" />
+      </g>
+      <ellipse cx="256" cy="130" rx="7" ry="2.4" fill="#166534" />
+      <g fill="#166534">
+        <circle className="rb-dot" cx="102" cy="50" r="2.6" />
+        <circle className="rb-dot" cx="112" cy="50" r="2.6" style={{ animationDelay: '0.35s' }} />
+        <circle className="rb-dot" cx="122" cy="50" r="2.6" style={{ animationDelay: '0.7s' }} />
+      </g>
+      <g className="rb-bob">
+        <line x1="128" y1="112" x2="120" y2="146" stroke="#334155" strokeWidth="6" strokeLinecap="round" />
+        <line x1="130" y1="112" x2="141" y2="146" stroke="#334155" strokeWidth="6" strokeLinecap="round" />
+        <path d="M118 84 Q130 76 140 84 L138 114 Q129 118 121 114 Z" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1" />
+        <circle cx="128" cy="66" r="10" fill="#f2c297" />
+        <path d="M117 64 Q128 52 140 63 L149 66 Q140 58 128 58 Q120 58 117 64 Z" fill="#166534" />
+        <line x1="134" y1="88" x2="146" y2="104" stroke="#f2c297" strokeWidth="5" strokeLinecap="round" />
+      </g>
+      <g className="rb-waggle" style={{ transformOrigin: '147px 105px' }}>
+        <line x1="147" y1="105" x2="154" y2="140" stroke="#475569" strokeWidth="3" strokeLinecap="round" />
+        <rect x="150" y="139" width="9" height="5" rx="2" fill="#1f2937" transform="rotate(18 154 141)" />
+      </g>
+      <line x1="159" y1="143" x2="159" y2="147" stroke="#94a3b8" strokeWidth="2" />
+      <circle cx="159" cy="141" r="3.4" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.8" />
+    </svg>
+  );
+}
+
 function PlayerRow({ player, selected, onToggle, onRename, onDelete, onGhin, onProfile }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(player.name);
@@ -265,6 +327,14 @@ function App() {
   const [scanReview, setScanReview] = useState(null);
   const scanLibRef = useRef(null);
   const [profileId, setProfileId] = useState(null);
+  const [myPlayerId, setMyPlayerId] = useState(null);
+  const [roundDate, setRoundDate] = useState(() => store.get('rb_round_date', null));
+  const [setupOverride, setSetupOverride] = useState(false);
+  const roleRef = useRef(null);
+  const sharedHoleRef = useRef(null);
+  const holeInitRef = useRef(false);
+  useEffect(() => { roleRef.current = myRole; }, [myRole]);
+  useEffect(() => { store.set('rb_round_date', roundDate); }, [roundDate]);
   const photoFileRef = useRef(null);
   const photoTargetRef = useRef(null);
   const scanTargetsRef = useRef([]);
@@ -312,8 +382,9 @@ function App() {
   useEffect(() => {
     if (!sb || !session) { setMyRole(null); cloudReady.current = false; return; }
     (async () => {
-      const { data: prof } = await sb.from('profiles').select('role').eq('user_id', session.user.id).single();
+      const { data: prof } = await sb.from('profiles').select('role, player_id').eq('user_id', session.user.id).single();
       setMyRole(prof?.role || 'viewer');
+      setMyPlayerId(prof?.player_id ?? null);
       const [{ data: prows }, { data: grows }, { data: live }] = await Promise.all([
         sb.from('players').select('*').order('id'),
         sb.from('games').select('*').order('played_at', { ascending: false }),
@@ -325,7 +396,7 @@ function App() {
         applyingRemote.current = true;
         setTeams(live.state.teams); setScores(live.state.scores || {});
         if (live.state.settings) setSettings(live.state.settings);
-        setGroups(live.state.groups || []); setSelected(live.state.selected || []); setCurrentHole(live.state.currentHole || 1);
+        setGroups(live.state.groups || []); setSelected(live.state.selected || []); setCurrentHole(live.state.currentHole || 1); setRoundDate(live.state.roundDate || null); holeInitRef.current = true; if (live.state.currentHole) sharedHoleRef.current = live.state.currentHole;
         setTimeout(() => { applyingRemote.current = false; }, 80);
       }
       cloudReady.current = true;
@@ -337,12 +408,19 @@ function App() {
     const ch = sb.channel('rb-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'live_round' }, (payload) => {
         const st = payload.new && payload.new.state;
-        if (!st || !st.teams) return;
+        if (!st) return;
         if (payload.new.updated_by === session.user.id) return;
         applyingRemote.current = true;
+        if (!st.teams) {
+          setTeams({ team1: [], team2: [], hasOddPlayers: false, teamWithExtra: null }); setScores({}); setGroups([]); setSelected([]); setRoundDate(null);
+          setTimeout(() => { applyingRemote.current = false; }, 80);
+          return;
+        }
         setTeams(st.teams); setScores(st.scores || {});
         if (st.settings) setSettings(st.settings);
-        setGroups(st.groups || []); setSelected(st.selected || []); setCurrentHole(st.currentHole || 1);
+        setGroups(st.groups || []); setSelected(st.selected || []); setRoundDate(st.roundDate || null);
+        if (st.currentHole) sharedHoleRef.current = st.currentHole;
+        if (roleRef.current === 'admin' || roleRef.current === 'scorekeeper' || !holeInitRef.current) { setCurrentHole(st.currentHole || 1); holeInitRef.current = true; }
         setTimeout(() => { applyingRemote.current = false; }, 80);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, async () => {
@@ -359,14 +437,14 @@ function App() {
 
   // push the in-progress round to the cloud (debounced; editors only)
   useEffect(() => {
-    if (!sb || !session || !canEdit || !cloudReady.current || applyingRemote.current) return;
+    if (!sb || !session || !(canEdit || myPlayerId != null) || !cloudReady.current || applyingRemote.current) return;
     if (!teams.team1.length && !teams.team2.length) return;
     clearTimeout(liveSaveTimer.current);
     liveSaveTimer.current = setTimeout(async () => {
-      const state = { teams, scores, settings, groups, selected, currentHole };
+      const state = { teams, scores, settings, groups, selected, currentHole: canEdit ? currentHole : (sharedHoleRef.current || currentHole), roundDate };
       await sb.from('live_round').update({ state, updated_by: session.user.id, updated_at: new Date().toISOString() }).eq('id', 1);
     }, 600);
-  }, [teams, scores, settings, groups, selected, currentHole, session, myRole]);
+  }, [teams, scores, settings, groups, selected, currentHole, roundDate, session, myRole, myPlayerId]);
 
   // keep the cloud roster/stats in step with local player edits (debounced; editors only)
   const playersJson = JSON.stringify(players);
@@ -427,6 +505,46 @@ function App() {
       </div>
     );
   };
+
+  /* ----- one round per day + role phases ----- */
+  const todayStr = () => new Date().toDateString();
+  const completedToday = games.some(g => { const d = new Date(g.date); return !isNaN(d) && d.toDateString() === todayStr(); });
+  const liveToday = !!(hasTeams && roundDate && roundDate === todayStr());
+  const phase = completedToday ? 'complete' : liveToday ? 'live' : 'waiting';
+  const isAdminUser = myRole === 'admin';
+  const setupLocked = liveToday || completedToday;
+  const myGroupIdx = myPlayerId != null ? groupOf(myPlayerId) : -1;
+  const canScorePlayer = (pid) => {
+    if (!session) return true;
+    if (isAdminUser) return true;
+    if (myPlayerId == null || myGroupIdx < 0) return false;
+    return groupOf(pid) === myGroupIdx;
+  };
+  const claimPlayer = async (pid) => {
+    if (!sb || !session) return;
+    const { error } = await sb.rpc('claim_player', { p_id: pid });
+    if (error) { flash(error.message); return; }
+    setMyPlayerId(pid);
+    flash('You are set as ' + ((players.find(p => p.id === pid) || {}).name || 'player'));
+  };
+  const cancelTodayRound = async () => {
+    if (!confirm("Cancel today's round? Scores entered so far will be cleared.")) return;
+    setTeams({ team1: [], team2: [], hasOddPlayers: false, teamWithExtra: null });
+    setScores({}); setCurrentHole(1); setSelected([]); setGroups([]); setActiveGroup(0); setRoundDate(null); setSetupOverride(false);
+    if (sb && session) { try { await sb.from('live_round').update({ state: {}, updated_by: session.user.id, updated_at: new Date().toISOString() }).eq('id', 1); } catch (e) {} }
+    flash("Today's round cancelled");
+  };
+  const prevPhaseRef = useRef(phase);
+  useEffect(() => {
+    if (!session || isAdminUser) { prevPhaseRef.current = phase; return; }
+    if (phase === 'live' && (view === 'waiting' || view === 'setup' || view === 'teams')) {
+      if (prevPhaseRef.current !== 'live') flash("Teams are set \u2014 you're in!");
+      if (myGroupIdx >= 0) setActiveGroup(myGroupIdx);
+      setView('money');
+    }
+    if (phase !== 'live' && (view === 'game' || view === 'money' || view === 'setup' || view === 'teams')) setView('waiting');
+    prevPhaseRef.current = phase;
+  }, [phase, session, myRole, view]);
 
   const groupsUI = () => {
     const byId = Object.fromEntries(allTeamPlayers.map(p => [p.id, p]));
@@ -497,6 +615,7 @@ function App() {
 
   /* ----- teams ----- */
   const createTeams = () => {
+    if (completedToday) { flash("Today's round is already complete \u2014 one round per day"); return; }
     const chosen = players.filter(p => selected.includes(p.id));
     const shuffled = [...chosen];
     for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; }
@@ -514,7 +633,7 @@ function App() {
     if (resetScores) {
       const init = {};
       [...team1, ...team2].forEach(p => { init[p.id] = Array(18).fill(null); });
-      setScores(init); setCurrentHole(1);
+      setScores(init); setCurrentHole(1); setRoundDate(new Date().toDateString());
       setGroups(autoGroups(team1, team2, groups)); setActiveGroup(0);
     } else {
       setScores(prev => { const n = { ...prev }; [...team1, ...team2].forEach(p => { if (!n[p.id]) n[p.id] = Array(18).fill(null); }); return n; });
@@ -530,7 +649,7 @@ function App() {
   };
 
   /* ----- scoring ----- */
-  const setScore = (pid, hole, val) => setScores(prev => ({ ...prev, [pid]: (prev[pid] || Array(18).fill(null)).map((s, i) => i === hole - 1 ? val : s) }));
+  const setScore = (pid, hole, val) => { if (session && !canScorePlayer(pid)) { flash('You can only enter scores for your own group'); return; } setScores(prev => ({ ...prev, [pid]: (prev[pid] || Array(18).fill(null)).map((s, i) => i === hole - 1 ? val : s) })); };
   const parseScore = (raw) => { if (raw === '' || raw == null) return null; const n = parseInt(raw, 10); return isNaN(n) || n < 1 ? null : Math.min(n, 20); };
   const bump = (pid, hole, delta) => {
     const par = COURSE.holes[hole - 1].par;
@@ -641,7 +760,7 @@ function App() {
     saveToSupabase(record, updated);
     // reset in-progress game
     setTeams({ team1: [], team2: [], hasOddPlayers: false, teamWithExtra: null });
-    setScores({}); setCurrentHole(1); setSelected([]); setGroups([]); setActiveGroup(0);
+    setScores({}); setCurrentHole(1); setSelected([]); setGroups([]); setActiveGroup(0); setRoundDate(null);
     flash('Round saved — stats updated');
     setView('stats');
   };
@@ -751,8 +870,27 @@ function App() {
   /* ---------- views ---------- */
   const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
+  const LockedSetupCard = (
+    <div className="card p-5 text-center space-y-3">
+      {liveToday ? (<>
+        <div className="text-4xl">\u26f3</div>
+        <h2 className="text-xl font-extrabold text-fairway-900">Today's round is already set up</h2>
+        <p className="text-gray-500 text-sm">One round per day \u2014 setup and teams are locked while it is being played.</p>
+        <button onClick={() => setView('game')} className="btn w-full bg-fairway-700 text-white font-bold rounded-xl py-3">Go to the game</button>
+        {isAdminUser && <button onClick={cancelTodayRound} className="btn w-full bg-white border border-red-200 text-red-600 font-semibold rounded-xl py-2.5 text-sm">Cancel today's round</button>}
+        {isAdminUser && <button onClick={() => setSetupOverride(true)} className="btn text-xs text-gray-400 underline">Admin: edit setup anyway</button>}
+      </>) : (<>
+        <div className="text-4xl">\ud83c\udfc6</div>
+        <h2 className="text-xl font-extrabold text-fairway-900">Today's round is in the books</h2>
+        <p className="text-gray-500 text-sm">Only one round per day. If it was finalized by mistake, delete it from Past rounds in Stats, then set up again.</p>
+        <button onClick={() => setView('stats')} className="btn w-full bg-fairway-700 text-white font-bold rounded-xl py-3">View results</button>
+      </>)}
+    </div>
+  );
+
   const Setup = () => (
     <div className="space-y-4">
+      {setupLocked && !setupOverride ? LockedSetupCard : (<>
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-fairway-900">Who's playing today?</h2>
@@ -797,6 +935,7 @@ function App() {
       ) : (
         <div className="text-center text-sm text-gray-500 py-2">Select at least 4 players to set up a game.</div>
       )}
+      </>)}
     </div>
   );
 
@@ -872,9 +1011,9 @@ function App() {
       </div>
     ) : null;
     const prepScan = () => { if (!session) { flash('Sign in to use scorecard scanning'); return; } scanTargetsRef.current = groupPlayers.map(p => ({ id: p.id, name: p.name })); if (scanLibRef.current) scanLibRef.current.click(); };
-    const ScanButton = (
+    const ScanButton = (!session || isAdminUser) ? (
       <button onClick={prepScan} className="btn w-full bg-white border-2 border-dashed border-fairway-600 text-fairway-800 font-bold rounded-xl py-3">📷 Use Scorecard Photo</button>
-    );
+    ) : null;
     const ModeSwitch = <div className="space-y-3">{ModeToggle}{GroupTabs}</div>;
 
     const StatusCard = (
@@ -920,7 +1059,7 @@ function App() {
                       <td className={`sticky left-0 ${bg} p-2 font-semibold whitespace-nowrap z-10`}>{p.name}</td>
                       {COURSE.holes.map((x, i) => (
                         <td key={i} className={'p-0.5 ' + (isAllBallsHole(x.hole) ? 'bg-amber-100' : '')}>
-                          <input type="number" inputMode="numeric" value={ps[i] ?? ''} onChange={e => setScore(p.id, x.hole, parseScore(e.target.value))} className={`w-10 text-center py-1.5 border rounded-lg ${scoreClass(ps[i], x.par)} font-semibold`} />
+                          <input type="number" inputMode="numeric" value={ps[i] ?? ''} disabled={!canScorePlayer(p.id)} onChange={e => setScore(p.id, x.hole, parseScore(e.target.value))} className={`w-10 text-center py-1.5 border rounded-lg ${scoreClass(ps[i], x.par)} font-semibold`} />
                         </td>
                       ))}
                       <td className="p-2 font-bold text-center">{total || '–'}</td>
@@ -933,22 +1072,23 @@ function App() {
             {settings.allBalls && <div className="text-xs text-amber-700 font-semibold mt-2">⭐ All balls holes: {settings.allBallsFront} & {settings.allBallsBack} — every player's score counts</div>}
           </div>
           {StatusCard}{BreakdownCard}
-          <button onClick={finalizeGame} className="btn w-full bg-fairway-700 text-white font-bold rounded-xl py-3.5">💾 Finalize round</button>
+          {(!session || isAdminUser) && <button onClick={finalizeGame} className="btn w-full bg-fairway-700 text-white font-bold rounded-xl py-3.5">💾 Finalize round</button>}
         </div>
       );
     }
 
     const PlayerScore = ({ p, accent }) => {
       const s = sc(p.id, currentHole - 1);
+      const editable = canScorePlayer(p.id);
       return (
         <div className="flex items-center gap-2 bg-white rounded-xl p-2 border">
           <div className="flex-1 min-w-0">
             <div className="font-semibold truncate">{p.name}</div>
             <div className={`text-xs ${s == null ? 'text-gray-400' : 'text-gray-500'}`}>{s == null ? 'tap + for par' : scoreLabel(s, h.par)}</div>
           </div>
-          <button onClick={() => bump(p.id, currentHole, -1)} className="btn w-11 h-11 rounded-xl bg-gray-100 text-xl font-bold">−</button>
+          {editable ? <button onClick={() => bump(p.id, currentHole, -1)} className="btn w-11 h-11 rounded-xl bg-gray-100 text-xl font-bold">−</button> : <span className="w-11 text-center text-gray-300 text-sm">🔒</span>}
           <div className={`w-10 text-center text-2xl font-extrabold ${scoreClass(s, h.par)}`}>{s ?? '–'}</div>
-          <button onClick={() => bump(p.id, currentHole, 1)} className={`btn w-11 h-11 rounded-xl text-xl font-bold text-white ${accent}`}>+</button>
+          {editable ? <button onClick={() => bump(p.id, currentHole, 1)} className={`btn w-11 h-11 rounded-xl text-xl font-bold text-white ${accent}`}>+</button> : <span className="w-11"></span>}
         </div>
       );
     };
@@ -991,7 +1131,7 @@ function App() {
 
         {StatusCard}{BreakdownCard}
 
-        {currentHole === 18 && <button onClick={finalizeGame} className="btn w-full bg-amber-500 text-white font-bold rounded-xl py-3.5 text-lg">🏆 Finalize round</button>}
+        {currentHole === 18 && (!session || isAdminUser) && <button onClick={finalizeGame} className="btn w-full bg-amber-500 text-white font-bold rounded-xl py-3.5 text-lg">🏆 Finalize round</button>}
       </div>
     );
   };
@@ -1085,6 +1225,67 @@ function App() {
     );
   };
 
+  const ClaimCard = () => (
+    <div className="card p-4">
+      <h3 className="font-bold text-fairway-900 mb-1">Which player are you?</h3>
+      <p className="text-sm text-gray-500 mb-3">Pick your name once \u2014 then the app shows your money and lets you enter scores for your group.</p>
+      <div className="flex flex-wrap gap-2">
+        {players.map(p => <button key={p.id} onClick={() => claimPlayer(p.id)} className="btn px-3 py-2 rounded-full bg-fairway-50 border border-fairway-200 text-sm font-semibold text-fairway-800">{p.name}</button>)}
+      </div>
+    </div>
+  );
+
+  const Waiting = () => (
+    <div className="space-y-4">
+      <div className="card p-5 text-center">
+        <WaitingGolfer />
+        {phase === 'complete' ? (<>
+          <h2 className="text-2xl font-extrabold text-fairway-900 mt-1">Today's Round Is Complete</h2>
+          <p className="text-gray-500 mt-1">The scores are in \u2014 nice playing out there.</p>
+          <button onClick={() => setView('stats')} className="btn mt-4 bg-fairway-700 text-white font-bold rounded-xl px-5 py-3">\ud83c\udfc6 See today's results</button>
+        </>) : (<>
+          <h2 className="text-2xl font-extrabold text-fairway-900 mt-1">Today's Round Is Still Being Setup</h2>
+          <p className="text-gray-500 mt-1">Teams and groups aren't set yet. As soon as they are, you'll be taken straight into the game.</p>
+        </>)}
+      </div>
+      {session && myPlayerId == null && ClaimCard()}
+      <div className="card p-4">
+        <h3 className="font-bold text-fairway-900 mb-3">Players</h3>
+        <div className="flex flex-wrap gap-2">
+          {players.map(p => (
+            <button key={p.id} onClick={() => setProfileId(p.id)} className="btn flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-gray-50 border">
+              {p.photoUrl ? <img src={p.photoUrl} className="w-7 h-7 rounded-full object-cover" /> : <span className="w-7 h-7 rounded-full bg-fairway-100 text-fairway-700 text-[10px] font-extrabold flex items-center justify-center">{p.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</span>}
+              <span className="text-sm font-semibold text-gray-700">{p.name}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setView('stats')} className="btn w-full mt-4 bg-fairway-50 border border-fairway-200 text-fairway-800 font-bold rounded-xl py-2.5">\ud83c\udfc6 Stats & past rounds</button>
+      </div>
+    </div>
+  );
+
+  const MoneyView = () => {
+    if (session && myPlayerId == null) return (<div className="space-y-4">{ClaimCard()}<div className="card p-4 text-center text-gray-500 text-sm">Pick your name above and your round money will show here.</div></div>);
+    const mine = players.find(p => p.id === myPlayerId);
+    const m = myPlayerId != null ? (calcMoney(18).money[myPlayerId] || 0) : 0;
+    let through = 0;
+    for (let i = 0; i < 18; i++) { if (allTeamPlayers.some(p => sc(p.id, i) !== null)) through = i + 1; }
+    const teamLabel = mine ? (teams.team1.some(p => p.id === mine.id) ? 'Team 1' : teams.team2.some(p => p.id === mine.id) ? 'Team 2' : '') : '';
+    return (
+      <div className="space-y-4">
+        <div className="card p-6 text-center">
+          <div className="text-xs uppercase tracking-widest text-gray-400 font-semibold">{mine ? mine.name : 'Your round'}</div>
+          <div className={'text-6xl font-extrabold my-3 ' + (m > 0 ? 'text-fairway-600' : m < 0 ? 'text-red-500' : 'text-gray-700')}>{money(m)}</div>
+          <div className="text-lg font-bold text-gray-700">{m > 0 ? "You're up \ud83d\udcb0" : m < 0 ? "You're down" : 'All square'}</div>
+          <div className="text-sm text-gray-400 mt-2">{through ? 'Through hole ' + through : 'No holes in yet'}{teamLabel ? ' \u00b7 ' + teamLabel : ''}{myGroupIdx >= 0 ? ' \u00b7 Group ' + (myGroupIdx + 1) : ''}</div>
+        </div>
+        <button onClick={() => setView('game')} className="btn w-full bg-fairway-700 text-white font-bold rounded-xl py-3.5">\ud83d\udcdd See hole by hole</button>
+        {myGroupIdx >= 0 && <p className="text-center text-xs text-gray-400">You can enter scores for Group {myGroupIdx + 1} from the hole-by-hole screen.</p>}
+        {mine && !teamLabel && <p className="text-center text-xs text-gray-400">You are not in today's round \u2014 you can still watch the scores live.</p>}
+      </div>
+    );
+  };
+
   const Stats = () => {
     const active = players.filter(p => p.stats.rounds > 0 || p.stats.moneyWon !== 0).sort((a, b) => b.stats.moneyWon - a.stats.moneyWon);
     return (
@@ -1142,7 +1343,11 @@ function App() {
     );
   };
 
-  const tabs = [['setup', '⛳', 'Setup', true], ['teams', '👥', 'Teams', hasTeams], ['game', '📝', 'Game', hasTeams], ['stats', '🏆', 'Stats', true]];
+  const tabs = (!session || isAdminUser)
+    ? [['setup', '\u26f3', 'Setup', true], ['teams', '\ud83d\udc65', 'Teams', hasTeams], ['game', '\ud83d\udcdd', 'Game', hasTeams], ['stats', '\ud83c\udfc6', 'Stats', true]]
+    : phase === 'live'
+      ? [['money', '\ud83d\udcb5', 'My $', true], ['game', '\ud83d\udcdd', 'Holes', true], ['stats', '\ud83c\udfc6', 'Stats', true]]
+      : [['waiting', '\u231b', 'Today', true], ['stats', '\ud83c\udfc6', 'Stats', true]];
 
   if (sb && !authReady) return (<div className="min-h-screen flex items-center justify-center text-gray-500">Loading...</div>);
   if (sb && !session && !offline) return (
@@ -1183,13 +1388,15 @@ function App() {
         {(profileId != null && players.some(x => x.id === profileId)) ? PlayerProfile() : (<>
         {view === 'setup' && Setup()}
         {view === 'teams' && hasTeams && Teams()}
+        {view === 'waiting' && Waiting()}
+        {view === 'money' && MoneyView()}
         {view === 'game' && Game()}
         {view === 'stats' && Stats()}
         </>)}
       </main>
 
       <nav className="nav fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t z-40">
-        <div className="max-w-3xl mx-auto grid grid-cols-4">
+        <div className={"max-w-3xl mx-auto grid " + (tabs.length === 2 ? "grid-cols-2" : tabs.length === 3 ? "grid-cols-3" : "grid-cols-4")}>
           {tabs.map(([k, ic, label, enabled]) => (
             <button key={k} disabled={!enabled} onClick={() => { setProfileId(null); setView(k); }} className={`py-2.5 flex flex-col items-center text-xs font-semibold disabled:opacity-30 ${view === k ? 'text-fairway-700' : 'text-gray-500'}`}>
               <span className={`text-xl ${view === k ? '' : 'grayscale opacity-70'}`}>{ic}</span>{label}
