@@ -17,6 +17,7 @@ tailwind.config = { theme: { extend: { colors: { fairway: { 50:'#f0fdf4',100:'#d
 <style>
   body { margin:0; background:#f3f1ea; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
   .hero { background: radial-gradient(circle at 20% 0%, rgba(255,255,255,.12), transparent 40%), linear-gradient(135deg,#14532d 0%,#166534 55%,#15803d 100%); }
+  .banner-photo { background: linear-gradient(rgba(4,32,18,.52), rgba(4,32,18,.30)), url('banner.jpg') center / cover no-repeat; }
   .card { background:#fff; border-radius:1rem; box-shadow:0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(20,83,45,.06); }
   .btn { transition: transform .08s, background .15s; } .btn:active { transform: scale(.96); }
   .pb { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
@@ -1158,7 +1159,7 @@ function App() {
 
   return (
     <div className="min-h-screen pb">
-      <header className="hero text-white">
+      <header className="hero banner-photo text-white">
         <div className="max-w-3xl mx-auto px-4 pt-6 pb-8 flex items-start justify-between">
           <div className="flex items-center gap-4 min-w-0">
             <div className="shrink-0 bg-white rounded-2xl p-1.5 shadow-lg">
