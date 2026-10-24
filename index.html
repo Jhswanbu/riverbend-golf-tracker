@@ -261,7 +261,6 @@ function App() {
   const [newPass, setNewPass] = useState('');
   const [scanBusy, setScanBusy] = useState(false);
   const [scanReview, setScanReview] = useState(null);
-  const scanFileRef = useRef(null);
   const scanLibRef = useRef(null);
   const scanTargetsRef = useRef([]);
   const cloudReady = useRef(false);
@@ -866,12 +865,9 @@ function App() {
         {entryMode === 'grid' && <button onClick={() => setActiveGroup('all')} className={`btn shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold ${gi === 'all' ? 'bg-fairway-700 text-white' : 'bg-white border text-gray-600'}`}>All</button>}
       </div>
     ) : null;
-    const prepScan = (ref) => { if (!session) { flash('Sign in to use scorecard scanning'); return; } scanTargetsRef.current = groupPlayers.map(p => ({ id: p.id, name: p.name })); if (ref.current) ref.current.click(); };
+    const prepScan = () => { if (!session) { flash('Sign in to use scorecard scanning'); return; } scanTargetsRef.current = groupPlayers.map(p => ({ id: p.id, name: p.name })); if (scanLibRef.current) scanLibRef.current.click(); };
     const ScanButton = (
-      <div className="flex gap-2">
-        <button onClick={() => prepScan(scanFileRef)} className="btn flex-1 bg-white border-2 border-dashed border-fairway-600 text-fairway-800 font-bold rounded-xl py-3">📷 Take scorecard photo</button>
-        <button onClick={() => prepScan(scanLibRef)} className="btn flex-1 bg-white border-2 border-dashed border-fairway-600 text-fairway-800 font-bold rounded-xl py-3">🖼️ Upload a photo</button>
-      </div>
+      <button onClick={prepScan} className="btn w-full bg-white border-2 border-dashed border-fairway-600 text-fairway-800 font-bold rounded-xl py-3">📷 Use Scorecard Photo</button>
     );
     const ModeSwitch = <div className="space-y-3">{ModeToggle}{GroupTabs}</div>;
 
@@ -1106,7 +1102,6 @@ function App() {
 
       {toast && <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg pop max-w-[90vw]">{toast}</div>}
 
-      <input ref={scanFileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanFile} />
       <input ref={scanLibRef} type="file" accept="image/*" className="hidden" onChange={handleScanFile} />
       {scanBusy && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 text-center font-semibold text-gray-700">📷 Reading scorecard...</div></div>}
       {scanReview && (
@@ -1161,7 +1156,7 @@ function App() {
           )}
 
           <h3 className="font-bold text-gray-800 mt-5 mb-1">Scorecard scanning (AI)</h3>
-          <p className="text-xs text-gray-500 mb-3">Built in for every signed-in player: in the Game view, tap Take scorecard photo (or Upload a photo from your library), review the read, and apply. The photo is read by the club's server, so no key or setup is needed on your phone.</p>
+          <p className="text-xs text-gray-500 mb-3">Built in for every signed-in player: in the Game view, tap Use Scorecard Photo - take a picture or pick one from your library - then review the read and apply. The photo is read by the club's server, so no key or setup is needed on your phone.</p>
 
           <h3 className="font-bold text-gray-800 mt-5 mb-2">Backup</h3>
           <div className="grid grid-cols-2 gap-2">
