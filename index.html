@@ -314,18 +314,35 @@ function BreakdownTable({ data }) {
 }
 
 /* ---------- main app ---------- */
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err: err }; }
+  render() {
+    if (this.state.err) {
+      return (<div className="min-h-screen flex items-center justify-center p-4"><div className="card w-full max-w-sm p-6 text-center">
+        <div className="text-4xl mb-2">\u26f3</div>
+        <h1 className="text-xl font-extrabold text-fairway-900">Something went wrong</h1>
+        <p className="text-sm text-gray-500 mt-1">The app hit a snag with its saved data. A reset usually fixes it — your account and cloud data (players, rounds) are safe.</p>
+        <p className="text-xs text-red-500 mt-2 break-words">{String((this.state.err && this.state.err.message) || this.state.err)}</p>
+        <button onClick={() => { try { Object.keys(window.localStorage).filter(k => k.indexOf('rb_') === 0).forEach(k => window.localStorage.removeItem(k)); } catch (e) {} window.location.reload(); }} className="btn w-full mt-4 bg-fairway-700 text-white font-bold rounded-xl py-3">Reset app data &amp; reload</button>
+      </div></div>);
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [view, setView] = useState('setup');
   const [entryMode, setEntryMode] = useState('hole');
   const [showSettings, setShowSettings] = useState(false);
   const [players, setPlayers] = useState(() => store.get('rb_players', defaultPlayers()));
   const [selected, setSelected] = useState(() => store.get('rb_selected', []));
-  const [teams, setTeams] = useState(() => store.get('rb_teams', { team1: [], team2: [], hasOddPlayers: false, teamWithExtra: null }));
+  const [teams, setTeams] = useState(() => { const t = store.get('rb_teams', null); return (t && Array.isArray(t.team1) && Array.isArray(t.team2)) ? t : { team1: [], team2: [], hasOddPlayers: false, teamWithExtra: null }; });
   const [settings, setSettings] = useState(() => store.get('rb_settings', { numBets: 1, betAmount: 5, betConfiguration: [], birdieBonus: false, parOrBetterBonus: false, allBalls: false, allBallsFront: 9, allBallsBack: 18 }));
   const [scores, setScores] = useState(() => store.get('rb_scores', {}));
   const [currentHole, setCurrentHole] = useState(() => store.get('rb_hole', 1));
   const [games, setGames] = useState(() => store.get('rb_games', []));
-  const [groups, setGroups] = useState(() => store.get('rb_groups', []));
+  const [groups, setGroups] = useState(() => { const gs = store.get('rb_groups', []); return (Array.isArray(gs) ? gs : []).filter(g => g && typeof g === 'object').map(g => ({ id: g.id != null ? g.id : 0, time: g.time || '', playerIds: Array.isArray(g.playerIds) ? g.playerIds : [] })); });
   const [activeGroup, setActiveGroup] = useState(0);
   const [newName, setNewName] = useState('');
   const [search, setSearch] = useState('');
@@ -410,9 +427,9 @@ function App() {
       if (grows) setGames(grows.map(gameRowToRecord));
       if (live && live.state && live.state.teams) {
         applyingRemote.current = true;
-        setTeams(live.state.teams); setScores(live.state.scores || {});
+        setTeams(normTeams(live.state.teams)); setScores(live.state.scores || {});
         if (live.state.settings) setSettings(live.state.settings);
-        setGroups(live.state.groups || []); setSelected(live.state.selected || []); setCurrentHole(live.state.currentHole || 1); setRoundDate(live.state.roundDate || null); holeInitRef.current = true; if (live.state.currentHole) sharedHoleRef.current = live.state.currentHole;
+        setGroups(normGroups(live.state.groups)); setSelected(live.state.selected || []); setCurrentHole(live.state.currentHole || 1); setRoundDate(live.state.roundDate || null); holeInitRef.current = true; if (live.state.currentHole) sharedHoleRef.current = live.state.currentHole;
         setTimeout(() => { applyingRemote.current = false; }, 80);
       }
       cloudReady.current = true;
@@ -432,9 +449,9 @@ function App() {
           setTimeout(() => { applyingRemote.current = false; }, 80);
           return;
         }
-        setTeams(st.teams); setScores(st.scores || {});
+        setTeams(normTeams(st.teams)); setScores(st.scores || {});
         if (st.settings) setSettings(st.settings);
-        setGroups(st.groups || []); setSelected(st.selected || []); setRoundDate(st.roundDate || null);
+        setGroups(normGroups(st.groups)); setSelected(st.selected || []); setRoundDate(st.roundDate || null);
         if (st.currentHole) sharedHoleRef.current = st.currentHole;
         if (roleRef.current === 'admin' || roleRef.current === 'scorekeeper' || !holeInitRef.current) { setCurrentHole(st.currentHole || 1); holeInitRef.current = true; }
         setTimeout(() => { applyingRemote.current = false; }, 80);
@@ -479,15 +496,17 @@ function App() {
   /* ----- tee-time groups ----- */
   const allTeamPlayers = [...teams.team1, ...teams.team2];
   useEffect(() => { if (hasTeams && groups.length === 0) setGroups(autoGroups(teams.team1, teams.team2)); }, [hasTeams]);
-  const groupOf = (pid) => groups.findIndex(g => g.playerIds.includes(pid));
+  const normTeams = (t) => (t && Array.isArray(t.team1) && Array.isArray(t.team2)) ? { team1: t.team1, team2: t.team2, hasOddPlayers: !!t.hasOddPlayers, teamWithExtra: t.teamWithExtra || null } : { team1: [], team2: [], hasOddPlayers: false, teamWithExtra: null };
+  const normGroups = (gs) => (Array.isArray(gs) ? gs : []).filter(g => g && typeof g === 'object').map(g => ({ id: g.id != null ? g.id : 0, time: g.time || '', playerIds: Array.isArray(g.playerIds) ? g.playerIds : [] }));
+  const groupOf = (pid) => (Array.isArray(groups) ? groups : []).findIndex(g => g && Array.isArray(g.playerIds) && g.playerIds.includes(pid));
   const movePlayer = (pid, to) => setGroups(gs => gs.map((g, i) => ({ ...g, playerIds: i === to ? [...g.playerIds.filter(x => x !== pid), pid] : g.playerIds.filter(x => x !== pid) })));
   const addGroup = () => setGroups(gs => [...gs, { id: Math.max(0, ...gs.map(g => g.id)) + 1, time: '', playerIds: [] }]);
   const removeGroup = (i) => setGroups(gs => gs.filter((_, k) => k !== i));
   const setGroupTime = (i, time) => setGroups(gs => gs.map((g, k) => k === i ? { ...g, time } : g));
   const groupsProblem = !groups.length ? 'Create at least one tee time.'
     : allTeamPlayers.some(p => groupOf(p.id) < 0) ? 'Every player needs a tee time.'
-    : groups.some(g => g.playerIds.length > MAX_GROUP) ? `No tee time can have more than ${MAX_GROUP} players.`
-    : groups.some(g => g.playerIds.length === 0) ? 'Remove empty tee times before starting.'
+    : groups.some(g => (g.playerIds || []).length > MAX_GROUP) ? `No tee time can have more than ${MAX_GROUP} players.`
+    : groups.some(g => (g.playerIds || []).length === 0) ? 'Remove empty tee times before starting.'
     : null;
 
   const betEditor = (N) => {
@@ -1017,7 +1036,7 @@ function App() {
     const h = COURSE.holes[currentHole - 1];
     const holeWin = getHoleWinner(currentHole);
     const gi = !groups.length ? 'all' : (activeGroup === 'all' ? (entryMode === 'grid' ? 'all' : 0) : Math.min(activeGroup, groups.length - 1));
-    const inGroup = (p) => gi === 'all' || groups[gi].playerIds.includes(p.id);
+    const inGroup = (p) => gi === 'all' || ((groups[gi] && groups[gi].playerIds) || []).includes(p.id);
     const groupPlayers = [...teams.team1, ...teams.team2].filter(inGroup);
 
     const ModeToggle = (
@@ -1503,7 +1522,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
 </script>
 </body>
 </html>
