@@ -779,9 +779,19 @@ function App() {
     const par = { key: 'par', label: 'Par or better', t1: 0, t2: 0 };
     const allb = { key: 'allballs', label: 'All balls', t1: 0, t2: 0 };
     const side = { team1: 't1', team2: 't2' };
+    // Bet points (Jon's rule, 2026-10-30): a ball bet scores only when a team wins
+    // two holes in a row in that bet. A loss or a tie breaks the run, and the runs
+    // reset after hole 9 -- winning holes 9 and 10 back to back does not score.
+    const prevWin = settings.betConfiguration.map(() => null);
     for (let hole = 1; hole <= throughHole; hole++) {
       const i = hole - 1, hp = COURSE.holes[i].par;
-      (getHoleWinner(hole) || []).forEach(x => { if (x.winner === 'team1') ball[x.betIndex].t1++; else if (x.winner === 'team2') ball[x.betIndex].t2++; });
+      if (hole === 10) prevWin.fill(null);
+      (getHoleWinner(hole) || []).forEach(x => {
+        if ((x.winner === 'team1' || x.winner === 'team2') && prevWin[x.betIndex] === x.winner) {
+          if (x.winner === 'team1') ball[x.betIndex].t1++; else ball[x.betIndex].t2++;
+        }
+        prevWin[x.betIndex] = x.winner;
+      });
       ['team1', 'team2'].forEach(t => {
         if (settings.birdieBonus) teams[t].forEach(p => { const s = sc(p.id, i); if (s !== null) { const u = hp - s; if (u >= 1) bonus[side[t]] += Math.min(u, 3); } });
         if (settings.parOrBetterBonus) {
