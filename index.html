@@ -779,20 +779,29 @@ function App() {
     const par = { key: 'par', label: 'Par or better', t1: 0, t2: 0 };
     const allb = { key: 'allballs', label: 'All balls', t1: 0, t2: 0 };
     const side = { team1: 't1', team2: 't2' };
-    // Bet structure (Jon's rule, 2026-10-30): within each ball bet, holes won build
-    // a lead -- a win moves a team up one, the other team's win moves it back, and a
-    // tie changes nothing (win, tie, win = up two). The moment a team is up two it
-    // wins the bet, and a new bet starts automatically from the next hole. The bets
-    // reset after hole 9: any unfinished bet is discarded and hole 10 starts fresh.
-    const betDiff = settings.betConfiguration.map(() => 0);
+    // Bet structure (Jon's rule, 2026-10-30): Nassau with automatic two-down
+    // presses, scored separately on each nine. Each ball bet starts a nine as one
+    // running bet; holes won/lost move its differential and ties change nothing.
+    // Whenever a bet newly reaches two down (either side), a press bet starts on
+    // the next hole and runs alongside it to the end of the nine. At the end of a
+    // nine, every running bet goes to whichever team is up in it; a level bet is a
+    // push. Mid-nine standings show the bets as they currently stand.
+    const openBets = settings.betConfiguration.map(() => [0]);
+    const awardOpenBets = () => { openBets.forEach((bets, bi) => { bets.forEach(d => { if (d > 0) ball[bi].t1++; else if (d < 0) ball[bi].t2++; }); }); };
     for (let hole = 1; hole <= throughHole; hole++) {
       const i = hole - 1, hp = COURSE.holes[i].par;
-      if (hole === 10) betDiff.fill(0);
+      if (hole === 10) { awardOpenBets(); openBets.forEach((bets, bi) => { openBets[bi] = [0]; }); }
       (getHoleWinner(hole) || []).forEach(x => {
-        if (x.winner === 'team1') betDiff[x.betIndex]++;
-        else if (x.winner === 'team2') betDiff[x.betIndex]--;
-        if (betDiff[x.betIndex] >= 2) { ball[x.betIndex].t1++; betDiff[x.betIndex] = 0; }
-        else if (betDiff[x.betIndex] <= -2) { ball[x.betIndex].t2++; betDiff[x.betIndex] = 0; }
+        const delta = x.winner === 'team1' ? 1 : x.winner === 'team2' ? -1 : 0;
+        if (delta === 0) return;
+        const bets = openBets[x.betIndex];
+        let presses = 0;
+        for (let k = 0; k < bets.length; k++) {
+          const prev = bets[k];
+          bets[k] = prev + delta;
+          if (Math.abs(bets[k]) === 2 && Math.abs(prev) < 2) presses++;
+        }
+        for (let k = 0; k < presses; k++) bets.push(0);
       });
       ['team1', 'team2'].forEach(t => {
         if (settings.birdieBonus) teams[t].forEach(p => { const s = sc(p.id, i); if (s !== null) { const u = hp - s; if (u >= 1) bonus[side[t]] += Math.min(u, 3); } });
@@ -802,6 +811,7 @@ function App() {
         }
       });
     }
+    awardOpenBets();
     if (settings.allBalls) {
       [settings.allBallsFront, settings.allBallsBack].forEach(h => {
         if (!h || throughHole < h) return;
