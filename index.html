@@ -779,18 +779,20 @@ function App() {
     const par = { key: 'par', label: 'Par or better', t1: 0, t2: 0 };
     const allb = { key: 'allballs', label: 'All balls', t1: 0, t2: 0 };
     const side = { team1: 't1', team2: 't2' };
-    // Bet points (Jon's rule, 2026-10-30): a ball bet scores only when a team wins
-    // two holes in a row in that bet. A loss or a tie breaks the run, and the runs
-    // reset after hole 9 -- winning holes 9 and 10 back to back does not score.
-    const prevWin = settings.betConfiguration.map(() => null);
+    // Bet structure (Jon's rule, 2026-10-30): within each ball bet, holes won build
+    // a lead -- a win moves a team up one, the other team's win moves it back, and a
+    // tie changes nothing (win, tie, win = up two). The moment a team is up two it
+    // wins the bet, and a new bet starts automatically from the next hole. The bets
+    // reset after hole 9: any unfinished bet is discarded and hole 10 starts fresh.
+    const betDiff = settings.betConfiguration.map(() => 0);
     for (let hole = 1; hole <= throughHole; hole++) {
       const i = hole - 1, hp = COURSE.holes[i].par;
-      if (hole === 10) prevWin.fill(null);
+      if (hole === 10) betDiff.fill(0);
       (getHoleWinner(hole) || []).forEach(x => {
-        if ((x.winner === 'team1' || x.winner === 'team2') && prevWin[x.betIndex] === x.winner) {
-          if (x.winner === 'team1') ball[x.betIndex].t1++; else ball[x.betIndex].t2++;
-        }
-        prevWin[x.betIndex] = x.winner;
+        if (x.winner === 'team1') betDiff[x.betIndex]++;
+        else if (x.winner === 'team2') betDiff[x.betIndex]--;
+        if (betDiff[x.betIndex] >= 2) { ball[x.betIndex].t1++; betDiff[x.betIndex] = 0; }
+        else if (betDiff[x.betIndex] <= -2) { ball[x.betIndex].t2++; betDiff[x.betIndex] = 0; }
       });
       ['team1', 'team2'].forEach(t => {
         if (settings.birdieBonus) teams[t].forEach(p => { const s = sc(p.id, i); if (s !== null) { const u = hp - s; if (u >= 1) bonus[side[t]] += Math.min(u, 3); } });
