@@ -116,38 +116,53 @@ const lev1 = (a, b) => { if (Math.abs(a.length - b.length) > 1) return false; le
 // Parse a captain's setup text. Unrecognized lines (headers, notes) are ignored.
 function parseSetupText(text) {
   const out = { team1: [], team2: [], groups: [], bets: [], allBalls: [] };
-  let section = null, groupIdx = -1;
+  let section = null, groupIdx = -1, teamBlock = 1;
   const cleanName = (s) => s.replace(/\s+/g, ' ').replace(/[.,;]+$/, '').trim();
   const nameEntry = (s) => {
     const m = s.match(/^(.+?)\s*[-–—]\s*([wbrc])$/i);
     if (m) return { name: cleanName(m[1]), tee: SETUP_TEE[m[2].toLowerCase()] || null };
     return { name: cleanName(s), tee: null };
   };
+  const pushNames = (arr, content) => { (content || '').split(',').map(x => x.trim()).filter(Boolean).forEach(n => arr.push(nameEntry(n))); };
+  const parseBets = (content) => {
+    (content || '').split(',').map(x => x.trim()).filter(Boolean).forEach(tok => {
+      const nums = (tok.match(/\d+/g) || []).map(Number).filter(n => n >= 1 && n <= 18);
+      if (!nums.length) return;
+      const idx = [...new Set(nums.map(n => n - 1))].sort((a, b) => a - b);
+      if (idx.length && !out.bets.some(b => b.join(',') === idx.join(','))) out.bets.push(idx);
+    });
+  };
+  const parseAllBalls = (content) => {
+    ((content || '').match(/\d+/g) || []).map(Number).filter(n => n >= 1 && n <= 18).forEach(h => { if (!out.allBalls.includes(h)) out.allBalls.push(h); });
+  };
   (text || '').split(/\r?\n/).forEach(rawLine => {
     const line = rawLine.trim();
-    if (!line) return;
+    if (!line) {
+      if (section === 'teams' && teamBlock === 1 && out.team1.length) teamBlock = 2;
+      return;
+    }
     let m;
-    if (/^team\s*1\b[^:]*:?$/i.test(line)) { section = 'team1'; return; }
-    if (/^team\s*2\b[^:]*:?$/i.test(line)) { section = 'team2'; return; }
-    if (/^bets?\s*:?$/i.test(line)) { section = 'bets'; return; }
-    if (/^all\s*balls?\s*:?$/i.test(line)) { section = 'allballs'; return; }
+    if ((m = line.match(/^team\s*1\b\s*:?\s*(.*)$/i))) { section = 'team1'; if (m[1]) pushNames(out.team1, m[1]); return; }
+    if ((m = line.match(/^team\s*2\b\s*:?\s*(.*)$/i))) { section = 'team2'; if (m[1]) pushNames(out.team2, m[1]); return; }
+    if (/^teams\b\s*:?$/i.test(line)) { section = 'teams'; teamBlock = out.team1.length ? 2 : 1; return; }
+    if ((m = line.match(/^bets?\b\s*:?\s*(.*)$/i))) { section = 'bets'; if (m[1]) parseBets(m[1]); return; }
+    if ((m = line.match(/^all\s*balls?\b\s*:?\s*(.*)$/i))) { section = 'allballs'; if (m[1]) parseAllBalls(m[1]); return; }
     if ((m = line.match(/^group\s*(\d+)\s*:?\s*(.*)$/i))) {
       section = 'group'; groupIdx = out.groups.length; out.groups.push([]);
-      if (m[2]) m[2].split(',').map(x => cleanName(x)).filter(Boolean).forEach(n => out.groups[groupIdx].push(nameEntry(n)));
+      if (m[2]) pushNames(out.groups[groupIdx], m[2]);
       return;
     }
-    if (section === 'team1' || section === 'team2') { out[section].push(nameEntry(line)); return; }
-    if (section === 'bets') {
-      (line.match(/\d+\s*[-–]\s*\d+/g) || []).forEach(pr => { const parts = pr.split(/[-–]/).map(x => parseInt(x.trim(), 10)); if (parts[0] >= 1 && parts[1] >= 1 && parts[0] !== parts[1]) out.bets.push([Math.min(parts[0], parts[1]) - 1, Math.max(parts[0], parts[1]) - 1]); });
-      return;
-    }
-    if (section === 'allballs') { if (/^\d{1,2}$/.test(line)) { const h = parseInt(line, 10); if (h >= 1 && h <= 18) out.allBalls.push(h); } return; }
-    if (section === 'group' && groupIdx >= 0) { line.split(',').map(x => cleanName(x)).filter(Boolean).forEach(n => out.groups[groupIdx].push(nameEntry(n))); return; }
+    if (/^(bets?|all\s*balls?|groups?|teams?)\b/i.test(line)) return;
+    if (section === 'team1') { pushNames(out.team1, line); return; }
+    if (section === 'team2') { pushNames(out.team2, line); return; }
+    if (section === 'teams') { pushNames(teamBlock === 2 ? out.team2 : out.team1, line); return; }
+    if (section === 'bets') { parseBets(line); return; }
+    if (section === 'allballs') { parseAllBalls(line); return; }
+    if (section === 'group' && groupIdx >= 0) { pushNames(out.groups[groupIdx], line); return; }
   });
   out.groups = out.groups.filter(g => g.length);
   return out;
 }
-
 // Best roster match for a typed name: exact, first+last, "First L", first or
 // last name alone, then one-letter-off first name (Erik -> Eric). Null if tied.
 function matchSetupName(raw, players) {
@@ -776,7 +791,7 @@ function App() {
   const toggleSelect = (id) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
   /* ----- teams ----- */
-  const setImportMatch = (key, val) => setSetupImport(si => ({ ...si, match: { ...si.match, [key]: val === '' ? null : val === 'new' ? 'new' : Number(val) } }));
+  const setImportMatch = (key, val) => setSetupImport(si => ({ ...si, match: { ...si.match, [key]: val === '' ? null : val === 'new' ? 'new' : val === 'ignore' ? 'ignore' : Number(val) } }));
 
   const runSetupParse = () => {
     const parsed = parseSetupText(setupImport.text);
@@ -798,13 +813,14 @@ function App() {
     const teeById = {}; const createdByName = {}; const created = [];
     const resolve = (key, e) => {
       const v = match[key];
+      if (v === 'ignore') return null;
       if (v === 'new') { const k = normName(e.name); if (!createdByName[k]) { const np = { id: Date.now() + created.length, name: e.name, tees: e.tee || 'White', stats: emptyStats() }; createdByName[k] = np; created.push(np); } return createdByName[k].id; }
       if (v != null && e.tee) teeById[v] = e.tee;
       return v;
     };
-    const t1ids = P.team1.map((e, i) => resolve('t1-' + i, e));
-    const t2ids = P.team2.map((e, i) => resolve('t2-' + i, e));
-    const gids = P.groups.map((g, gi) => g.map((e, i) => resolve('g' + gi + '-' + i, e)));
+    const t1ids = P.team1.map((e, i) => resolve('t1-' + i, e)).filter(id => id != null);
+    const t2ids = P.team2.map((e, i) => resolve('t2-' + i, e)).filter(id => id != null);
+    const gids = P.groups.map((g, gi) => g.map((e, i) => resolve('g' + gi + '-' + i, e)).filter(id => id != null));
     let nextRoster = [...players, ...created].map(p => teeById[p.id] ? { ...p, tees: teeById[p.id] } : p);
     nextRoster = sortPlayers(nextRoster);
     if (created.length || Object.keys(teeById).length) setPlayers(nextRoster);
@@ -1850,18 +1866,19 @@ function App() {
           ) : (() => {
             const P = setupImport.parsed;
             const rosterSorted = [...players].sort((a, b) => a.name.localeCompare(b.name));
-            const tokOf = (key) => { const v = setupImport.match[key]; return v == null ? null : v === 'new' ? 'new:' + normName(setupImport.names[key]) : 'id:' + v; };
+            const tokOf = (key) => { const v = setupImport.match[key]; return v == null ? null : v === 'ignore' ? 'ignore' : v === 'new' ? 'new:' + normName(setupImport.names[key]) : 'id:' + v; };
             const keysT = [...P.team1.map((_, i) => 't1-' + i), ...P.team2.map((_, i) => 't2-' + i)];
             const keysG = []; P.groups.forEach((g, gi) => g.forEach((_, i) => keysG.push('g' + gi + '-' + i)));
-            const countTok = (keys) => { const c = {}; keys.forEach(k => { const t = tokOf(k); if (t) c[t] = (c[t] || 0) + 1; }); return c; };
+            const countTok = (keys) => { const c = {}; keys.forEach(k => { const t = tokOf(k); if (t && t !== 'ignore') c[t] = (c[t] || 0) + 1; }); return c; };
             const dupT = countTok(keysT), dupG = countTok(keysG);
             const teamTokSet = new Set(keysT.map(tokOf).filter(Boolean));
             const flagOf = {};
-            keysT.forEach(k => { const t = tokOf(k); if (!t) flagOf[k] = 'PICK A PLAYER'; else if (dupT[t] > 1) flagOf[k] = 'LISTED TWICE'; });
-            keysG.forEach(k => { const t = tokOf(k); if (!t) flagOf[k] = 'PICK A PLAYER'; else if (dupG[t] > 1) flagOf[k] = 'IN TWO GROUPS'; else if (!teamTokSet.has(t)) flagOf[k] = 'NOT ON A TEAM'; });
+            keysT.forEach(k => { const t = tokOf(k); if (!t) flagOf[k] = 'PICK A PLAYER'; else if (t !== 'ignore' && dupT[t] > 1) flagOf[k] = 'LISTED TWICE'; });
+            keysG.forEach(k => { const t = tokOf(k); if (!t) flagOf[k] = 'PICK A PLAYER'; else if (t !== 'ignore' && dupG[t] > 1) flagOf[k] = 'IN TWO GROUPS'; else if (t !== 'ignore' && !teamTokSet.has(t)) flagOf[k] = 'NOT ON A TEAM'; });
             const labelOf = (k) => { const nm = setupImport.names[k]; if (k[0] === 'g') return nm + ' (Group ' + (parseInt(k.slice(1).split('-')[0], 10) + 1) + ')'; return nm + (k.indexOf('t1') === 0 ? ' (Team 1)' : ' (Team 2)'); };
             const problems = [];
-            if (!P.team1.length || !P.team2.length) problems.push('Both teams need at least one player.');
+            const pickedCount = (keys) => keys.filter(k => { const v = setupImport.match[k]; return v != null && v !== 'ignore'; }).length;
+            if (!pickedCount(keysT.slice(0, P.team1.length)) || !pickedCount(keysT.slice(P.team1.length))) problems.push('Both teams need at least one player who is not ignored.');
             const unpicked = [...keysT, ...keysG].filter(k => flagOf[k] === 'PICK A PLAYER');
             if (unpicked.length) problems.push('Needs a player picked: ' + unpicked.map(labelOf).join(', ') + '.');
             const dupKeys = keysT.filter(k => flagOf[k] === 'LISTED TWICE');
@@ -1870,18 +1887,19 @@ function App() {
             if (twoGroupKeys.length) problems.push('In more than one group: ' + twoGroupKeys.map(labelOf).join(', ') + '.');
             const strayKeys = keysG.filter(k => flagOf[k] === 'NOT ON A TEAM');
             if (strayKeys.length) problems.push('In a group but not on a team: ' + strayKeys.map(labelOf).join(', ') + '. If it is the same person as a team row, pick that same player here.');
-            const row = (prefix, e, i, dupMap) => { const key = prefix + i; const v = setupImport.match[key]; const flag = flagOf[key]; return (
+            const row = (prefix, e, i, dupMap) => { const key = prefix + i; const v = setupImport.match[key]; const flag = flagOf[key]; const ign = v === 'ignore'; return (
               <div key={key} className={'flex items-center gap-2 rounded-lg px-2.5 py-1.5 ' + (flag ? 'bg-red-50 ring-1 ring-red-300' : 'bg-gray-50')}>
-                <span className="flex-1 font-medium truncate">{e.name}{e.tee ? <span className="ml-1.5 text-[11px] font-bold text-gray-400">{e.tee}</span> : null}{flag ? <span className="ml-1.5 text-[11px] font-bold text-red-700 bg-red-100 rounded-full px-2 py-0.5">{flag}</span> : null}</span>
+                <span className={'flex-1 font-medium truncate' + (ign ? ' line-through opacity-50' : '')}>{e.name}{e.tee ? <span className="ml-1.5 text-[11px] font-bold text-gray-400">{e.tee}</span> : null}{flag ? <span className="ml-1.5 text-[11px] font-bold text-red-700 bg-red-100 rounded-full px-2 py-0.5">{flag}</span> : null}</span>
                 <select value={v == null ? '' : v} onChange={ev => setImportMatch(key, ev.target.value)} className="text-sm border rounded-lg px-1.5 py-1 bg-white max-w-[55%]">
                   <option value="">- pick a player -</option>
                   {rosterSorted.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   <option value="new">+ Add as new player</option>
+                  <option value="ignore">Ignore - not a player</option>
                 </select>
               </div> ); };
             return (
               <div>
-                <p className="text-sm text-gray-500 mb-3">Check each name against the roster - the app guessed, you confirm. {P.bets.length ? 'Bets: ' + P.bets.map(b => (b[0] + 1) + '-' + (b[1] + 1)).join(', ') + '. ' : 'No bets found - current bet settings kept. '}{P.allBalls.length ? 'All balls: hole' + (P.allBalls.length > 1 ? 's ' : ' ') + P.allBalls.join(' & ') + '.' : 'No all-balls holes found.'}</p>
+                <p className="text-sm text-gray-500 mb-3">Check each name against the roster - the app guessed, you confirm. If a line is not a player, pick Ignore on its row and it will be left out. {P.bets.length ? 'Bets: ' + P.bets.map(b => b.map(n => n + 1).join('-')).join(', ') + '. ' : 'No bets found - current bet settings kept. '}{P.allBalls.length ? 'All balls: hole' + (P.allBalls.length > 1 ? 's ' : ' ') + P.allBalls.join(' & ') + '.' : 'No all-balls holes found.'}</p>
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Team 1</div>
                 <div className="space-y-1.5 mb-3">{P.team1.map((e, i) => row('t1-', e, i, dupT))}</div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Team 2</div>
