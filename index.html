@@ -358,6 +358,8 @@ function App() {
   const [scanBusy, setScanBusy] = useState(false);
   const [scanReview, setScanReview] = useState(null);
   const scanLibRef = useRef(null);
+  const [combinedCheck, setCombinedCheck] = useState(null);
+  const combinedFileRef = useRef(null);
   const [profileId, setProfileId] = useState(null);
   const [myPlayerId, setMyPlayerId] = useState(null);
   const [profileLinks, setProfileLinks] = useState([]);
@@ -911,10 +913,10 @@ function App() {
       const rows = rawRows.map(r => {
         let pid = (r.playerId != null && targets.some(t => t.id === r.playerId)) ? r.playerId : '';
         if (!pid && r.name) { const rn = String(r.name).toLowerCase(); const free = targets.filter(t => !usedPids.has(t.id)); const m = free.find(t => t.name.toLowerCase() === rn) || free.find(t => t.name.toLowerCase().startsWith(rn) || rn.startsWith(t.name.toLowerCase().split(' ')[0])); if (m) { pid = m.id; usedPids.add(m.id); } }
-        return { playerId: pid, name: r.name || '', scores: Array.from({ length: 18 }, (_, i) => { const v = (r.scores || [])[i]; return (typeof v === 'number' && v >= 1 && v <= 20) ? v : null; }), unsure: r.unsure || [], out: (r.out === undefined ? null : r.out), in: (r.in === undefined ? null : r.in), tot: (r.tot === undefined ? null : r.tot) };
+        return { playerId: pid, name: r.name || '', scores: Array.from({ length: 18 }, (_, i) => { const v = (r.scores || [])[i]; return (typeof v === 'number' && v >= 1 && v <= 20) ? v : null; }), unsure: r.unsure || [], out: (r.out === undefined ? null : r.out), in: (r.in === undefined ? null : r.in), tot: (r.tot === undefined ? null : r.tot), confirmed: false };
       });
       if (!rows.length) throw new Error('No player rows could be read from that photo');
-      setScanReview({ rows });
+      setScanReview({ rows, photo: dataUrl, targets });
     } catch (err) { flash('Scan failed: ' + err.message); }
     setScanBusy(false);
   };
@@ -923,6 +925,8 @@ function App() {
     if (!scanReview) return;
     const ids = scanReview.rows.map(r => r.playerId).filter(Boolean);
     if (ids.some((v, i) => ids.indexOf(v) !== i)) { flash('Two rows are assigned to the same player - fix before applying'); return; }
+    if (scanReview.rows.some(r => !r.playerId)) { flash('Every row needs a player before applying'); return; }
+    if (scanReview.rows.some(r => !r.confirmed)) { flash('Confirm every row before applying'); return; }
     setScores(prev => {
       const next = { ...prev };
       scanReview.rows.forEach(r => {
@@ -937,14 +941,59 @@ function App() {
     flash('Scores applied from scorecard');
   };
 
+  const handleCombinedFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!session) { flash('Sign in to use scorecard scanning'); return; }
+    setScanBusy(true); flash('Reading combined card...');
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const { data: parsed, error: fnErr } = await sb.functions.invoke('scan-scorecard', { body: { imageDataUrl: dataUrl, mode: 'combined', abFront: settings.allBallsFront || 1, abBack: settings.allBallsBack || 11, pars: COURSE.holes.map(h => h.par) } });
+      if (fnErr) throw new Error('Scan failed - are you signed in?');
+      if (!parsed) throw new Error('The scan service returned nothing');
+      if (parsed.error) throw new Error(parsed.error);
+      const bets = (parsed.bets || []).map(row => Array.from({ length: 18 }, (_, i) => { const v = (row || [])[i]; return (typeof v === 'number' && v >= 2 && v <= 30) ? v : null; }));
+      if (bets.length < 3) throw new Error('The bets table could not be read from that photo');
+      setCombinedCheck({ bets, allBallsFront: (typeof parsed.allBallsFront === 'number' ? parsed.allBallsFront : null), allBallsBack: (typeof parsed.allBallsBack === 'number' ? parsed.allBallsBack : null), names: parsed.names || [], team: 'team1', photo: dataUrl });
+    } catch (err) { flash('Scan failed: ' + err.message); }
+    setScanBusy(false);
+  };
+
+  const teamBetSums = (teamKey) => {
+    const ids = (teams[teamKey] || []).map(p => p.id);
+    return settings.betConfiguration.map(cfg => Array.from({ length: 18 }, (_, h) => {
+      if (!ids.length) return null;
+      const vals = ids.map(id => sc(id, h));
+      if (vals.some(v => v == null)) return null;
+      const sorted = vals.slice().sort((a, b) => a - b);
+      const picked = cfg.players.map(pi => sorted[pi]);
+      return picked.some(v => v == null) ? null : picked.reduce((a, b) => a + b, 0);
+    }));
+  };
+
+  const teamAllBalls = (teamKey, hole) => {
+    const ids = (teams[teamKey] || []).map(p => p.id);
+    if (!ids.length) return null;
+    const vals = ids.map(id => sc(id, hole - 1));
+    return vals.every(v => v != null) ? vals.reduce((a, b) => a + b, 0) : null;
+  };
+
+  const scanSuspects = (r) => {
+    const s = new Set(r.unsure || []);
+    r.scores.forEach((v, i) => { if (v != null && (v - COURSE.holes[i].par >= 3 || v >= 9)) s.add(i + 1); });
+    return [...s].sort((a, b) => a - b);
+  };
+
   const scanRowCheck = (r) => {
     const front = r.scores.slice(0, 9).reduce((a, v) => a + (v || 0), 0);
     const back = r.scores.slice(9).reduce((a, v) => a + (v || 0), 0);
     const missing = r.scores.filter(v => v == null).length;
     if (missing) return missing + ' hole' + (missing > 1 ? 's' : '') + ' unread';
-    if (r.out != null && r.out !== front) return 'Front adds to ' + front + ', card says ' + r.out;
-    if (r.in != null && r.in !== back) return 'Back adds to ' + back + ', card says ' + r.in;
-    if (r.tot != null && r.tot !== front + back) return 'Total adds to ' + (front + back) + ', card says ' + r.tot;
+    const hint = (holes) => { const sus = scanSuspects(r).filter(h => holes.includes(h)); return sus.length ? ' Check hole' + (sus.length > 1 ? 's' : '') + ' ' + sus.join(', ') + ' first.' : ''; };
+    if (r.out != null && r.out !== front) return 'Front adds to ' + front + ', card says ' + r.out + '.' + hint([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    if (r.in != null && r.in !== back) return 'Back adds to ' + back + ', card says ' + r.in + '.' + hint([10, 11, 12, 13, 14, 15, 16, 17, 18]);
+    if (r.tot != null && r.tot !== front + back) return 'Total adds to ' + (front + back) + ', card says ' + r.tot + '.' + hint([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
     return '\u2713 Totals match the card';
   };
 
@@ -1124,6 +1173,9 @@ function App() {
     const ScanButton = (!session || isAdminUser) ? (
       <button onClick={prepScan} className="btn w-full bg-white border-2 border-dashed border-fairway-600 text-fairway-800 font-bold rounded-xl py-3">📷 Use Scorecard Photo</button>
     ) : null;
+    const CombinedButton = (!session || isAdminUser) ? (
+      <button onClick={() => { if (!session) { flash('Sign in to use scorecard scanning'); return; } if (combinedFileRef.current) combinedFileRef.current.click(); }} className="btn w-full bg-white border-2 border-dashed border-sky-600 text-sky-800 font-bold rounded-xl py-3">🧾 Check Combined Card</button>
+    ) : null;
     const ModeSwitch = <div className="space-y-3">{ModeToggle}{GroupTabs}</div>;
 
     const StatusCard = (
@@ -1150,6 +1202,7 @@ function App() {
         <div className="space-y-4">
           {ModeSwitch}
           {ScanButton}
+          {CombinedButton}
           <div className="card p-3 overflow-x-auto">
             <table className="text-sm border-collapse min-w-full">
               <thead>
@@ -1209,6 +1262,7 @@ function App() {
       <div className="space-y-4">
         {ModeSwitch}
         {ScanButton}
+        {CombinedButton}
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
           {COURSE.holes.map(x => {
             const done = groupPlayers.every(p => sc(p.id, x.hole - 1) !== null);
@@ -1618,35 +1672,90 @@ function App() {
       {toast && <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg pop max-w-[90vw]">{toast}</div>}
 
       <input ref={scanLibRef} type="file" accept="image/*" className="hidden" onChange={handleScanFile} />
+      <input ref={combinedFileRef} type="file" accept="image/*" className="hidden" onChange={handleCombinedFile} />
       <input ref={photoFileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoFile} />
+      {combinedCheck && (
+        <Modal title="Combined card check" onClose={() => setCombinedCheck(null)}>
+          <p className="text-sm text-gray-500 mb-3">Comparing the totals written on the combined card against the scores currently entered. Anything listed below is worth a second look - the card and the app disagree.</p>
+          {combinedCheck.photo && <img src={combinedCheck.photo} alt="Combined scorecard" className="w-full max-h-64 object-contain rounded-xl border mb-3 bg-gray-50" />}
+          {combinedCheck.names.length ? <p className="text-xs text-gray-500 mb-3">Names read on the card: {combinedCheck.names.join(', ')}</p> : null}
+          <div className="flex bg-gray-100 rounded-xl p-1 text-sm font-semibold mb-3">
+            {[['team1', 'Team 1'], ['team2', 'Team 2']].map(([k, l]) => (
+              <button key={k} onClick={() => setCombinedCheck(cc => ({ ...cc, team: k }))} className={'flex-1 py-1.5 rounded-lg ' + (combinedCheck.team === k ? 'bg-white shadow text-fairway-800' : 'text-gray-500')}>{l}</button>
+            ))}
+          </div>
+          {(() => {
+            const sums = teamBetSums(combinedCheck.team);
+            const problems = [];
+            let checked = 0;
+            sums.forEach((row, bi) => row.forEach((v, h) => {
+              const card = (combinedCheck.bets[bi] || [])[h];
+              if (v == null || card == null) return;
+              checked++;
+              if (v !== card) problems.push('Bet ' + (bi + 1) + ', hole ' + (h + 1) + ': card says ' + card + ', entered scores add to ' + v);
+            }));
+            const abF = teamAllBalls(combinedCheck.team, settings.allBallsFront || 1);
+            const abB = teamAllBalls(combinedCheck.team, settings.allBallsBack || 11);
+            if (abF != null && combinedCheck.allBallsFront != null && abF !== combinedCheck.allBallsFront) problems.push('All balls, hole ' + (settings.allBallsFront || 1) + ': card says ' + combinedCheck.allBallsFront + ', entered scores add to ' + abF);
+            if (abB != null && combinedCheck.allBallsBack != null && abB !== combinedCheck.allBallsBack) problems.push('All balls, hole ' + (settings.allBallsBack || 11) + ': card says ' + combinedCheck.allBallsBack + ', entered scores add to ' + abB);
+            if (!checked) return <div className="text-sm text-amber-700 font-semibold">Not enough scores are entered for this team yet to check anything.</div>;
+            if (!problems.length) return <div className="text-sm text-fairway-700 font-semibold">{'\u2713'} All {checked} bet totals match the combined card.</div>;
+            return (<div className="space-y-1.5">{problems.map((p, i) => <div key={i} className="text-sm text-red-700 font-semibold bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">{p}</div>)}</div>);
+          })()}
+          <button onClick={() => setCombinedCheck(null)} className="btn w-full mt-4 bg-gray-100 rounded-xl py-2.5 text-sm font-semibold">Close</button>
+        </Modal>
+      )}
+
       {scanBusy && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 text-center font-semibold text-gray-700">📷 Reading scorecard...</div></div>}
       {scanReview && (
         <Modal title="Review scanned scores" onClose={() => setScanReview(null)}>
-          <p className="text-sm text-gray-500 mb-3">Check the amber cells against the card, fix anything wrong, then apply. Blank means not read.</p>
+          <p className="text-sm text-gray-500 mb-3">Confirm each row is the right player, check the flagged cells against the card, then apply. Blank means not read.</p>
+          {scanReview.photo && <img src={scanReview.photo} alt="Scanned scorecard" className="w-full max-h-72 object-contain rounded-xl border mb-3 bg-gray-50" />}
           <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
-            {scanReview.rows.map((r, ri) => (
+            {scanReview.rows.map((r, ri) => {
+              const chk = scanRowCheck(r);
+              const mismatch = !chk.startsWith('\u2713') && !chk.includes('unread');
+              const sus = mismatch ? scanSuspects(r) : [];
+              const selPlayer = players.find(p => p.id === r.playerId);
+              return (
               <div key={ri} className="border rounded-xl p-2.5">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm text-gray-700">Card reads: <b>{r.name || '(no name)'}</b></span>
+                  {!r.playerId ? <span className="text-[11px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">NEEDS A PLAYER</span> : !r.confirmed ? <span className="text-[11px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">UNCONFIRMED</span> : <span className="text-[11px] font-bold text-fairway-700 bg-green-50 rounded-full px-2 py-0.5">{'\u2713'} CONFIRMED</span>}
+                </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <select value={r.playerId} onChange={e => { const v = e.target.value === '' ? '' : Number(e.target.value); setScanReview(sr => ({ rows: sr.rows.map((x, xi) => xi === ri ? { ...x, playerId: v } : x) })); }} className="border rounded-lg px-2 py-1.5 text-sm font-semibold flex-1 min-w-0">
+                  <select value={r.playerId} onChange={e => { const v = e.target.value === '' ? '' : Number(e.target.value); setScanReview(sr => ({ ...sr, rows: sr.rows.map((x, xi) => xi === ri ? { ...x, playerId: v, confirmed: false } : x) })); }} className="border rounded-lg px-2 py-1.5 text-sm font-semibold flex-1 min-w-0">
                     <option value="">- assign player -</option>
                     {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
-                  <span className="text-xs text-gray-400 shrink-0">card: {r.name || '?'}</span>
+                  {r.playerId && !r.confirmed ? <button onClick={() => setScanReview(sr => ({ ...sr, rows: sr.rows.map((x, xi) => xi === ri ? { ...x, confirmed: true } : x) }))} className="btn shrink-0 bg-fairway-700 text-white text-sm font-bold rounded-lg px-3 py-1.5">{'\u2713'} This is {selPlayer ? selPlayer.name : 'him'}</button> : null}
                 </div>
                 <div className="grid grid-cols-9 gap-1">
                   {r.scores.map((v, i) => (
                     <div key={i} className="text-center">
                       <div className="text-[10px] text-gray-400">{i + 1}</div>
-                      <input type="number" inputMode="numeric" value={v ?? ''} onChange={e => { const nv = parseScore(e.target.value); setScanReview(sr => ({ rows: sr.rows.map((x, xi) => xi === ri ? { ...x, scores: x.scores.map((s, si) => si === i ? nv : s) } : x) })); }} className={'w-full text-center py-1 rounded-md border text-sm ' + (r.unsure.includes(i + 1) ? 'bg-amber-100 border-amber-300' : '')} />
+                      <input type="number" inputMode="numeric" value={v ?? ''} onChange={e => { const nv = parseScore(e.target.value); setScanReview(sr => ({ ...sr, rows: sr.rows.map((x, xi) => xi === ri ? { ...x, scores: x.scores.map((s, si) => si === i ? nv : s) } : x) })); }} className={'w-full text-center py-1 rounded-md border text-sm ' + (sus.includes(i + 1) ? 'bg-red-100 border-red-400' : r.unsure.includes(i + 1) ? 'bg-amber-100 border-amber-300' : '')} />
                     </div>
                   ))}
                 </div>
-                <div className={'text-xs mt-1.5 ' + (scanRowCheck(r).startsWith('\u2713') ? 'text-fairway-700' : 'text-amber-700 font-semibold')}>{scanRowCheck(r)}</div>
+                <div className={'text-xs mt-1.5 ' + (chk.startsWith('\u2713') ? 'text-fairway-700' : 'text-amber-700 font-semibold')}>{chk}</div>
               </div>
-            ))}
+              );
+            })}
           </div>
-          {(() => { const ids = scanReview.rows.map(r => r.playerId).filter(Boolean); return ids.some((v, i) => ids.indexOf(v) !== i) ? <div className="text-sm text-red-600 font-semibold mt-3">Two rows are assigned to the same player - fix the assignments before applying.</div> : null; })()}
-          <button onClick={applyScan} className="btn w-full mt-4 bg-fairway-700 text-white rounded-xl py-3 font-bold">Apply scores</button>
+          {(() => {
+            const ids = scanReview.rows.map(r => r.playerId).filter(Boolean);
+            const dup = ids.some((v, i) => ids.indexOf(v) !== i);
+            const unassigned = scanReview.rows.filter(r => !r.playerId).length;
+            const unconfirmed = scanReview.rows.filter(r => r.playerId && !r.confirmed).length;
+            const missing = (scanReview.targets || []).filter(t => !ids.includes(t.id));
+            const ready = !dup && unassigned === 0 && unconfirmed === 0;
+            return (<>
+              {dup ? <div className="text-sm text-red-600 font-semibold mt-3">Two rows are assigned to the same player - fix the assignments before applying.</div> : null}
+              {missing.length ? <div className="text-sm text-amber-700 font-semibold mt-3">No row read for: {missing.map(t => t.name).join(', ')}. If they are on this card, rescan or enter their scores by hand.</div> : null}
+              <button onClick={applyScan} disabled={!ready} className={'btn w-full mt-4 rounded-xl py-3 font-bold ' + (ready ? 'bg-fairway-700 text-white' : 'bg-gray-200 text-gray-500')}>{ready ? 'Apply scores' : 'Apply scores (' + scanReview.rows.filter(r => r.confirmed).length + ' of ' + scanReview.rows.length + ' rows confirmed)'}</button>
+            </>);
+          })()}
           <button onClick={() => setScanReview(null)} className="btn w-full mt-2 bg-gray-100 rounded-xl py-2.5 text-sm font-semibold">Cancel</button>
         </Modal>
       )}
