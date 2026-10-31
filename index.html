@@ -108,6 +108,68 @@ function sanitizeConfig(config, N, numBets) {
   return cfg.map((b, i) => ({ betNumber: i + 1, players: b.players, description: describe(b.players) }));
 }
 
+/* ---------- setup-text import ---------- */
+const SETUP_TEE = { w: 'White', b: 'Blue', c: 'Combo', r: 'Red' };
+const normName = (s) => (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const lev1 = (a, b) => { if (Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, edits = 0; while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; } else { edits++; if (edits > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } } } return edits + (a.length - i) + (b.length - j) <= 1; };
+
+// Parse a captain's setup text. Unrecognized lines (headers, notes) are ignored.
+function parseSetupText(text) {
+  const out = { team1: [], team2: [], groups: [], bets: [], allBalls: [] };
+  let section = null, groupIdx = -1;
+  const cleanName = (s) => s.replace(/\s+/g, ' ').replace(/[.,;]+$/, '').trim();
+  const nameEntry = (s) => {
+    const m = s.match(/^(.+?)\s*[-–—]\s*([wbrc])$/i);
+    if (m) return { name: cleanName(m[1]), tee: SETUP_TEE[m[2].toLowerCase()] || null };
+    return { name: cleanName(s), tee: null };
+  };
+  (text || '').split(/\r?\n/).forEach(rawLine => {
+    const line = rawLine.trim();
+    if (!line) return;
+    let m;
+    if (/^team\s*1\b[^:]*:?$/i.test(line)) { section = 'team1'; return; }
+    if (/^team\s*2\b[^:]*:?$/i.test(line)) { section = 'team2'; return; }
+    if (/^bets?\s*:?$/i.test(line)) { section = 'bets'; return; }
+    if (/^all\s*balls?\s*:?$/i.test(line)) { section = 'allballs'; return; }
+    if ((m = line.match(/^group\s*(\d+)\s*:?\s*(.*)$/i))) {
+      section = 'group'; groupIdx = out.groups.length; out.groups.push([]);
+      if (m[2]) m[2].split(',').map(x => cleanName(x)).filter(Boolean).forEach(n => out.groups[groupIdx].push(nameEntry(n)));
+      return;
+    }
+    if (section === 'team1' || section === 'team2') { out[section].push(nameEntry(line)); return; }
+    if (section === 'bets') {
+      (line.match(/\d+\s*[-–]\s*\d+/g) || []).forEach(pr => { const parts = pr.split(/[-–]/).map(x => parseInt(x.trim(), 10)); if (parts[0] >= 1 && parts[1] >= 1 && parts[0] !== parts[1]) out.bets.push([Math.min(parts[0], parts[1]) - 1, Math.max(parts[0], parts[1]) - 1]); });
+      return;
+    }
+    if (section === 'allballs') { if (/^\d{1,2}$/.test(line)) { const h = parseInt(line, 10); if (h >= 1 && h <= 18) out.allBalls.push(h); } return; }
+    if (section === 'group' && groupIdx >= 0) { line.split(',').map(x => cleanName(x)).filter(Boolean).forEach(n => out.groups[groupIdx].push(nameEntry(n))); return; }
+  });
+  out.groups = out.groups.filter(g => g.length);
+  return out;
+}
+
+// Best roster match for a typed name: exact, first+last, "First L", first or
+// last name alone, then one-letter-off first name (Erik -> Eric). Null if tied.
+function matchSetupName(raw, players) {
+  const rn = normName(raw); if (!rn) return null;
+  const rt = rn.split(' ');
+  const scored = players.map(p => {
+    const pn = normName(p.name); const pt = pn.split(' ');
+    let score = 0;
+    if (pn === rn) score = 100;
+    else if (rt.length >= 2 && pt.length >= 2 && rt[0] === pt[0] && rt[rt.length - 1] === pt[pt.length - 1]) score = 95;
+    else if (rt.length >= 2 && rt[1].length === 1 && pt.length >= 2 && rt[0] === pt[0] && pt[pt.length - 1][0] === rt[1]) score = 90;
+    else if (rt.length === 1 && pt[0] === rt[0]) score = 80;
+    else if (rt.length === 1 && pt[pt.length - 1] === rt[0]) score = 78;
+    else if (rt.length === 1 && pt.length === 1 && lev1(rt[0], pt[0])) score = 65;
+    else if (rt.length >= 1 && pt.length >= 2 && lev1(rt[0], pt[0])) score = 60;
+    return { id: p.id, score };
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+  if (!scored.length) return null;
+  if (scored.length > 1 && scored[0].score === scored[1].score) return null;
+  return scored[0].id;
+}
+
 /* ---------- tee-time groups ---------- */
 const MAX_GROUP = 5; // auto-assign target size only - NOT a cap; groups can hold any number of players
 const fmtTime = (t) => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; };
@@ -360,6 +422,7 @@ function App() {
   const scanLibRef = useRef(null);
   const [combinedCheck, setCombinedCheck] = useState(null);
   const combinedFileRef = useRef(null);
+  const [setupImport, setSetupImport] = useState(null);
   const [profileId, setProfileId] = useState(null);
   const [myPlayerId, setMyPlayerId] = useState(null);
   const [profileLinks, setProfileLinks] = useState([]);
@@ -701,6 +764,53 @@ function App() {
   const toggleSelect = (id) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
   /* ----- teams ----- */
+  const setImportMatch = (key, val) => setSetupImport(si => ({ ...si, match: { ...si.match, [key]: val === '' ? null : val === 'new' ? 'new' : Number(val) } }));
+
+  const runSetupParse = () => {
+    const parsed = parseSetupText(setupImport.text);
+    if (!parsed.team1.length && !parsed.team2.length) { flash('No team lists found in that text'); return; }
+    const match = {}; const names = {};
+    const put = (prefix, list) => list.forEach((e, i) => { match[prefix + i] = matchSetupName(e.name, players); names[prefix + i] = e.name; });
+    put('t1-', parsed.team1); put('t2-', parsed.team2);
+    parsed.groups.forEach((g, gi) => put('g' + gi + '-', g));
+    setSetupImport(si => ({ ...si, parsed, match, names }));
+  };
+
+  const applySetupImport = () => {
+    if (isGuest) return;
+    if (completedToday) { flash("Today's round is already complete - one round per day"); return; }
+    const anyScores = Object.values(scores || {}).some(arr => (arr || []).some(s => s != null));
+    if (anyScores && !confirm('Applying this setup clears the current scores. Continue?')) return;
+    const P = setupImport.parsed; const match = setupImport.match;
+    const teeById = {}; const createdByName = {}; const created = [];
+    const resolve = (key, e) => {
+      const v = match[key];
+      if (v === 'new') { const k = normName(e.name); if (!createdByName[k]) { const np = { id: Date.now() + created.length, name: e.name, tees: e.tee || 'White', stats: emptyStats() }; createdByName[k] = np; created.push(np); } return createdByName[k].id; }
+      if (v != null && e.tee) teeById[v] = e.tee;
+      return v;
+    };
+    const t1ids = P.team1.map((e, i) => resolve('t1-' + i, e));
+    const t2ids = P.team2.map((e, i) => resolve('t2-' + i, e));
+    const gids = P.groups.map((g, gi) => g.map((e, i) => resolve('g' + gi + '-' + i, e)));
+    let nextRoster = [...players, ...created].map(p => teeById[p.id] ? { ...p, tees: teeById[p.id] } : p);
+    nextRoster = sortPlayers(nextRoster);
+    if (created.length || Object.keys(teeById).length) { setPlayers(nextRoster); sheetPost(playersPayload(nextRoster)); }
+    const byId = Object.fromEntries(nextRoster.map(p => [p.id, p]));
+    const team1 = t1ids.map(id => byId[id]).filter(Boolean);
+    const team2 = t2ids.map(id => byId[id]).filter(Boolean);
+    const teamIdSet = new Set([...t1ids, ...t2ids]);
+    let finalGroups = gids.map(ids => [...new Set(ids.filter(id => teamIdSet.has(id)))]).filter(ids => ids.length).map((ids, i) => ({ id: i + 1, time: '', playerIds: ids }));
+    if (!finalGroups.length) finalGroups = autoGroups(team1, team2);
+    setSelected([...t1ids, ...t2ids]);
+    setTeams({ team1, team2, hasOddPlayers: (team1.length + team2.length) % 2 !== 0, teamWithExtra: team1.length > team2.length ? 'team1' : team2.length > team1.length ? 'team2' : null });
+    setSettings(s => ({ ...s, ...(P.bets.length ? { numBets: P.bets.length, betConfiguration: P.bets.map((pl, i) => ({ betNumber: i + 1, players: pl, description: describe(pl) })) } : {}), ...(P.allBalls.length ? { allBalls: true, allBallsFront: P.allBalls[0], allBallsBack: P.allBalls.length > 1 ? P.allBalls[1] : s.allBallsBack } : {}) }));
+    const init = {}; [...team1, ...team2].forEach(p => { init[p.id] = Array(18).fill(null); });
+    setScores(init); setCurrentHole(1);
+    setGroups(finalGroups); setActiveGroup(0);
+    setSetupImport(null); setView('teams');
+    flash('Game set up from the text - check the teams and groups, then Start round');
+  };
+
   const createTeams = () => {
     if (isGuest) return;
     if (completedToday) { flash("Today's round is already complete \u2014 one round per day"); return; }
@@ -1050,6 +1160,11 @@ function App() {
     <div className="space-y-4">
       {setupLocked && !setupOverride ? LockedSetupCard : (<>
       <div className="card p-4">
+        <h2 className="text-lg font-bold text-fairway-900 mb-1">📋 Set up from a text</h2>
+        <p className="text-sm text-gray-500 mb-3">Paste the captain's text - teams, tees, bets, all-balls holes, and groups - and the game is preset for you to check.</p>
+        <button onClick={() => setSetupImport({ text: '', parsed: null, match: {}, names: {} })} className="btn w-full bg-fairway-700 text-white font-bold rounded-xl py-3">Paste setup text</button>
+      </div>
+      <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-fairway-900">Who's playing today?</h2>
           <span className="text-sm font-semibold bg-fairway-100 text-fairway-800 px-3 py-1 rounded-full">{selected.length} selected</span>
@@ -1129,6 +1244,7 @@ function App() {
       </div>
       <div className="border-t pt-4">{groupsUI()}</div>
       {groupsProblem && <div className="text-sm bg-amber-50 text-amber-800 rounded-lg p-2.5">{groupsProblem}</div>}
+      <button onClick={() => setSetupImport({ text: '', parsed: null, match: {}, names: {} })} className="btn w-full bg-white border-2 border-dashed border-fairway-600 text-fairway-800 font-bold rounded-xl py-3">📋 Set up from a text instead</button>
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => { if (confirm('Re-draw teams? Current scores will be cleared.')) createTeams(); }} className="btn bg-gray-100 font-semibold rounded-xl py-3">🔀 Reshuffle</button>
         <button disabled={!!groupsProblem} onClick={() => { setActiveGroup(0); setView('game'); }} className="btn bg-fairway-700 disabled:opacity-40 text-white font-bold rounded-xl py-3">▶️ Start round</button>
@@ -1705,6 +1821,56 @@ function App() {
         </Modal>
       )}
 
+      {setupImport && (
+        <Modal title="Set up from a text" onClose={() => setSetupImport(null)}>
+          {!setupImport.parsed ? (
+            <div>
+              <p className="text-sm text-gray-500 mb-3">Paste the text with the two teams (tee letters W = White, B = Blue, C = Combo, R = Red), the bets, the all-balls holes, and the groups. Anything else in the message is ignored.</p>
+              <textarea value={setupImport.text} onChange={e => setSetupImport(si => ({ ...si, text: e.target.value }))} rows={12} placeholder={"Team 1:\nFrank - w\nFletcher - w\n...\n\nBets:\n1-2\n3-4\n5-6"} className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+              <button onClick={runSetupParse} disabled={!setupImport.text.trim()} className="btn w-full mt-3 bg-fairway-700 disabled:opacity-40 text-white rounded-xl py-3 font-bold">Read the setup</button>
+              <button onClick={() => setSetupImport(null)} className="btn w-full mt-2 bg-gray-100 rounded-xl py-2.5 text-sm font-semibold">Cancel</button>
+            </div>
+          ) : (() => {
+            const P = setupImport.parsed;
+            const rosterSorted = [...players].sort((a, b) => a.name.localeCompare(b.name));
+            const tokOf = (key) => { const v = setupImport.match[key]; return v == null ? null : v === 'new' ? 'new:' + normName(setupImport.names[key]) : 'id:' + v; };
+            const keysT = [...P.team1.map((_, i) => 't1-' + i), ...P.team2.map((_, i) => 't2-' + i)];
+            const keysG = []; P.groups.forEach((g, gi) => g.forEach((_, i) => keysG.push('g' + gi + '-' + i)));
+            const countTok = (keys) => { const c = {}; keys.forEach(k => { const t = tokOf(k); if (t) c[t] = (c[t] || 0) + 1; }); return c; };
+            const dupT = countTok(keysT), dupG = countTok(keysG);
+            const teamTokSet = new Set(keysT.map(tokOf).filter(Boolean));
+            const problems = [];
+            if (!P.team1.length || !P.team2.length) problems.push('Both teams need at least one player.');
+            if (keysT.some(k => !tokOf(k)) || keysG.some(k => !tokOf(k))) problems.push('Every name needs a player picked.');
+            if (Object.values(dupT).some(n => n > 1)) problems.push('A player is listed twice across the teams.');
+            if (Object.values(dupG).some(n => n > 1)) problems.push('A player is in more than one group.');
+            if (keysG.some(k => { const t = tokOf(k); return t && !teamTokSet.has(t); })) problems.push('A group includes someone who is not on either team.');
+            const row = (prefix, e, i, dupMap) => { const key = prefix + i; const v = setupImport.match[key]; const t = tokOf(key); const bad = !!(t && dupMap[t] > 1); return (
+              <div key={key} className={'flex items-center gap-2 rounded-lg px-2.5 py-1.5 ' + (bad ? 'bg-red-50' : 'bg-gray-50')}>
+                <span className="flex-1 font-medium truncate">{e.name}{e.tee ? <span className="ml-1.5 text-[11px] font-bold text-gray-400">{e.tee}</span> : null}</span>
+                <select value={v == null ? '' : v} onChange={ev => setImportMatch(key, ev.target.value)} className="text-sm border rounded-lg px-1.5 py-1 bg-white max-w-[55%]">
+                  <option value="">- pick a player -</option>
+                  {rosterSorted.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  <option value="new">+ Add as new player</option>
+                </select>
+              </div> ); };
+            return (
+              <div>
+                <p className="text-sm text-gray-500 mb-3">Check each name against the roster - the app guessed, you confirm. {P.bets.length ? 'Bets: ' + P.bets.map(b => (b[0] + 1) + '-' + (b[1] + 1)).join(', ') + '. ' : 'No bets found - current bet settings kept. '}{P.allBalls.length ? 'All balls: hole' + (P.allBalls.length > 1 ? 's ' : ' ') + P.allBalls.join(' & ') + '.' : 'No all-balls holes found.'}</p>
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Team 1</div>
+                <div className="space-y-1.5 mb-3">{P.team1.map((e, i) => row('t1-', e, i, dupT))}</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Team 2</div>
+                <div className="space-y-1.5 mb-3">{P.team2.map((e, i) => row('t2-', e, i, dupT))}</div>
+                {P.groups.map((g, gi) => (<div key={gi}><div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Group {gi + 1}</div><div className="space-y-1.5 mb-3">{g.map((e, i) => row('g' + gi + '-', e, i, dupG))}</div></div>))}
+                {problems.map((p, i) => <div key={i} className="text-sm text-red-700 font-semibold bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 mb-1.5">{p}</div>)}
+                <button onClick={applySetupImport} disabled={!!problems.length} className={'btn w-full mt-2 rounded-xl py-3 font-bold ' + (problems.length ? 'bg-gray-200 text-gray-500' : 'bg-fairway-700 text-white')}>Apply setup</button>
+                <button onClick={() => setSetupImport(si => ({ ...si, parsed: null, match: {}, names: {} }))} className="btn w-full mt-2 bg-gray-100 rounded-xl py-2.5 text-sm font-semibold">Back to the text</button>
+                <button onClick={() => setSetupImport(null)} className="btn w-full mt-2 bg-gray-100 rounded-xl py-2.5 text-sm font-semibold">Cancel</button>
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
       {scanBusy && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 text-center font-semibold text-gray-700">📷 Reading scorecard...</div></div>}
       {scanReview && (
         <Modal title="Review scanned scores" onClose={() => setScanReview(null)}>
