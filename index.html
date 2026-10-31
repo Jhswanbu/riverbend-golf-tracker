@@ -109,7 +109,7 @@ function sanitizeConfig(config, N, numBets) {
 }
 
 /* ---------- tee-time groups ---------- */
-const MAX_GROUP = 5;
+const MAX_GROUP = 5; // auto-assign target size only - NOT a cap; groups can hold any number of players
 const fmtTime = (t) => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; };
 const groupLabel = (g, i) => g.time ? fmtTime(g.time) : `Tee ${i + 1}`;
 
@@ -546,7 +546,6 @@ function App() {
   const setGroupTime = (i, time) => setGroups(gs => gs.map((g, k) => k === i ? { ...g, time } : g));
   const groupsProblem = !groups.length ? 'Create at least one tee time.'
     : allTeamPlayers.some(p => groupOf(p.id) < 0) ? 'Every player needs a tee time.'
-    : groups.some(g => (g.playerIds || []).length > MAX_GROUP) ? `No tee time can have more than ${MAX_GROUP} players.`
     : groups.some(g => (g.playerIds || []).length === 0) ? 'Remove empty tee times before starting.'
     : null;
 
@@ -625,7 +624,7 @@ function App() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h3 className="font-bold text-fairway-900">Tee times</h3>
-            <p className="text-xs text-gray-500">Max {MAX_GROUP} per group. Scores are entered by group.</p>
+            <p className="text-xs text-gray-500">Auto-assign starts groups at 4-5 players, but there is no size limit - anyone can be moved to any group. Scores are entered by group.</p>
           </div>
           <div className="flex gap-1.5">
             <button onClick={() => setGroups(autoGroups(teams.team1, teams.team2, groups))} className="btn text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100">Auto-assign</button>
@@ -638,7 +637,7 @@ function App() {
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-bold">Group {gi + 1}</span>
                 <input type="time" value={g.time} onChange={e => setGroupTime(gi, e.target.value)} className="border rounded-lg px-2 py-1 text-sm" />
-                <span className={`ml-auto text-xs font-semibold px-2 py-1 rounded-full ${g.playerIds.length >= MAX_GROUP ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>{g.playerIds.length}/{MAX_GROUP}</span>
+                <span className="ml-auto text-xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-600">{g.playerIds.length} player{g.playerIds.length === 1 ? '' : 's'}</span>
                 {g.playerIds.length === 0 && groups.length > 1 && <button onClick={() => removeGroup(gi)} className="text-gray-400 text-sm">Remove</button>}
               </div>
               <div className="space-y-1.5">
@@ -647,7 +646,7 @@ function App() {
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isT1(id) ? 'bg-sky-500' : 'bg-emerald-500'}`} />
                     <span className="flex-1 font-medium truncate">{byId[id].name}</span>
                     <select value={gi} onChange={e => movePlayer(id, parseInt(e.target.value))} className="text-sm border rounded-lg px-1.5 py-1 bg-white">
-                      {groups.map((gg, k) => <option key={gg.id} value={k} disabled={k !== gi && gg.playerIds.length >= MAX_GROUP}>Group {k + 1}{gg.time ? ` · ${fmtTime(gg.time)}` : ''}{k !== gi && gg.playerIds.length >= MAX_GROUP ? ' (full)' : ''}</option>)}
+                      {groups.map((gg, k) => <option key={gg.id} value={k}>Group {k + 1}{gg.time ? ` · ${fmtTime(gg.time)}` : ''}</option>)}
                     </select>
                   </div>
                 ))}
