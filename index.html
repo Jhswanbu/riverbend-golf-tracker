@@ -514,7 +514,7 @@ function App() {
           applyingRemote.current = true;
           if (Array.isArray(data.players) && data.players.length) setPlayers(sortPlayers(data.players.map(rowToPlayer)));
           const live = data.live || {};
-          if (live.teams && ((live.teams.team1 || []).length || (live.teams.team2 || []).length)) {
+          if (live.teams && ((live.teams.team1 || []).length || (live.teams.team2 || []).length) && (!live.roundDate || live.roundDate === todayStr())) {
             setTeams(normTeams(live.teams)); setScores(live.scores || {});
             if (live.settings) setSettings(live.settings);
             setGroups(normGroups(live.groups)); setSelected(live.selected || []); setRoundDate(live.roundDate || null);
@@ -652,6 +652,8 @@ function App() {
   const isAdminUser = myRole === 'admin';
   const isGuest = guestMode && !session;
   const setupLocked = liveToday || completedToday;
+  const tomorrowStr = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toDateString(); };
+  const forTomorrow = !!(roundDate && roundDate === tomorrowStr());
   const myGroupIdx = myPlayerId != null ? groupOf(myPlayerId) : -1;
   const canScorePlayer = (pid) => {
     if (isGuest) return false;
@@ -666,6 +668,16 @@ function App() {
     setScores({}); setCurrentHole(1); setSelected([]); setGroups([]); setActiveGroup(0); setRoundDate(null); setSetupOverride(false);
     if (sb && session) { try { await sb.from('live_round').update({ state: {}, updated_by: session.user.id, updated_at: new Date().toISOString() }).eq('id', 1); } catch (e) {} }
     flash("Today's round cancelled");
+  };
+  const startTomorrowSetup = () => {
+    const tmr = tomorrowStr();
+    if (roundDate === tmr && hasTeams) { setSetupOverride(true); setView('teams'); flash("Tomorrow's game is already set up - here it is"); return; }
+    if (roundDate === tmr) { setSetupOverride(true); setView('setup'); return; }
+    if (!confirm("Set up tomorrow's game (" + tmr + ") now? Today's round stays saved in the books - this only presets tomorrow.")) return;
+    setTeams({ team1: [], team2: [], hasOddPlayers: false, teamWithExtra: null });
+    setScores({}); setCurrentHole(1); setSelected([]); setGroups([]); setActiveGroup(0);
+    setRoundDate(tmr); setSetupOverride(true); setView('setup');
+    flash("Setting up tomorrow's game - " + tmr);
   };
   const prevPhaseRef = useRef(phase);
   useEffect(() => {
@@ -778,7 +790,7 @@ function App() {
 
   const applySetupImport = () => {
     if (isGuest) return;
-    if (completedToday) { flash("Today's round is already complete - one round per day"); return; }
+    if (completedToday && roundDate !== tomorrowStr()) { flash("Today's round is already complete - one round per day"); return; }
     const anyScores = Object.values(scores || {}).some(arr => (arr || []).some(s => s != null));
     if (anyScores && !confirm('Applying this setup clears the current scores. Continue?')) return;
     const P = setupImport.parsed; const match = setupImport.match;
@@ -813,7 +825,7 @@ function App() {
 
   const createTeams = () => {
     if (isGuest) return;
-    if (completedToday) { flash("Today's round is already complete \u2014 one round per day"); return; }
+    if (completedToday && roundDate !== tomorrowStr()) { flash("Today's round is already complete \u2014 one round per day"); return; }
     const chosen = players.filter(p => selected.includes(p.id));
     const shuffled = [...chosen];
     for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; }
@@ -831,7 +843,7 @@ function App() {
     if (resetScores) {
       const init = {};
       [...team1, ...team2].forEach(p => { init[p.id] = Array(18).fill(null); });
-      setScores(init); setCurrentHole(1); setRoundDate(new Date().toDateString());
+      setScores(init); setCurrentHole(1); setRoundDate(prev => (prev && new Date(prev) > new Date(new Date().toDateString())) ? prev : new Date().toDateString());
       setGroups(autoGroups(team1, team2, groups)); setActiveGroup(0);
     } else {
       setScores(prev => { const n = { ...prev }; [...team1, ...team2].forEach(p => { if (!n[p.id]) n[p.id] = Array(18).fill(null); }); return n; });
@@ -955,6 +967,7 @@ function App() {
 
   const finalizeGame = () => {
     if (isGuest) return;
+    if (roundDate && new Date(roundDate) > new Date(todayStr())) { flash('This game is set for ' + roundDate + ' - it can only be finalized on the day it is played'); return; }
     const all = [...teams.team1, ...teams.team2];
     const incomplete = all.filter(p => (scores[p.id] || []).some(s => s === null));
     if (incomplete.length && !confirm(`${incomplete.length} player(s) have missing scores. Finalize anyway?`)) return;
@@ -1152,6 +1165,7 @@ function App() {
         <h2 className="text-xl font-extrabold text-fairway-900">Today's round is in the books</h2>
         <p className="text-gray-500 text-sm">Only one round per day. If it was finalized by mistake, delete it from Past rounds in Stats, then set up again.</p>
         <button onClick={() => setView('stats')} className="btn w-full bg-fairway-700 text-white font-bold rounded-xl py-3">View results</button>
+        {isAdminUser && <button onClick={startTomorrowSetup} className="btn w-full bg-white border-2 border-fairway-600 text-fairway-800 font-bold rounded-xl py-3">{forTomorrow ? "📅 Tomorrow's game - view or edit its setup" : "📅 Set up tomorrow's game"}</button>}
       </>)}
     </div>
   );
@@ -1159,6 +1173,7 @@ function App() {
   const Setup = () => (
     <div className="space-y-4">
       {setupLocked && !setupOverride ? LockedSetupCard : (<>
+      {forTomorrow && <div className="card p-3 bg-sky-50 border border-sky-200 text-sky-800 text-sm font-semibold">📅 You're setting up tomorrow's game ({roundDate}). Today's round is saved in the books and won't be touched.</div>}
       <div className="card p-4">
         <h2 className="text-lg font-bold text-fairway-900 mb-1">📋 Set up from a text</h2>
         <p className="text-sm text-gray-500 mb-3">Paste the captain's text - teams, tees, bets, all-balls holes, and groups - and the game is preset for you to check.</p>
@@ -1233,6 +1248,7 @@ function App() {
         <h2 className="text-lg font-bold text-fairway-900">Teams</h2>
         <p className="text-sm text-gray-500">Tap a player to move them to the other team.</p>
       </div>
+      {forTomorrow && <div className="text-sm bg-sky-50 border border-sky-200 text-sky-800 rounded-lg p-2.5 font-semibold">📅 This is tomorrow's game ({roundDate}). It becomes the live round tomorrow - today's results are untouched, and it can't be finalized until tomorrow.</div>}
       <div className="grid grid-cols-2 gap-3">
         <TeamCol id="team1" label="Team 1" color="blue" />
         <TeamCol id="team2" label="Team 2" color="green" />
