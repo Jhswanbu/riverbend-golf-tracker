@@ -790,9 +790,10 @@ function App() {
 
   const applySetupImport = () => {
     if (isGuest) return;
-    if (completedToday && roundDate !== tomorrowStr()) { flash("Today's round is already complete - one round per day"); return; }
+    const forNextDay = completedToday && roundDate !== tomorrowStr();
+    if (forNextDay) setRoundDate(tomorrowStr());
     const anyScores = Object.values(scores || {}).some(arr => (arr || []).some(s => s != null));
-    if (anyScores && !confirm('Applying this setup clears the current scores. Continue?')) return;
+    if (anyScores && !forNextDay && !confirm('Applying this setup clears the current scores. Continue?')) return;
     const P = setupImport.parsed; const match = setupImport.match;
     const teeById = {}; const createdByName = {}; const created = [];
     const resolve = (key, e) => {
@@ -820,12 +821,12 @@ function App() {
     setScores(init); setCurrentHole(1);
     setGroups(finalGroups); setActiveGroup(0);
     setSetupImport(null); setView('teams');
-    flash('Game set up from the text - check the teams and groups, then Start round');
+    flash(forNextDay ? "Tomorrow's game is set up from the text - check the teams and groups" : 'Game set up from the text - check the teams and groups, then Start round');
   };
 
   const createTeams = () => {
     if (isGuest) return;
-    if (completedToday && roundDate !== tomorrowStr()) { flash("Today's round is already complete \u2014 one round per day"); return; }
+    if (completedToday && roundDate !== tomorrowStr()) setRoundDate(tomorrowStr());
     const chosen = players.filter(p => selected.includes(p.id));
     const shuffled = [...chosen];
     for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; }
@@ -1740,7 +1741,7 @@ function App() {
       <main className="max-w-3xl mx-auto px-4 -mt-4">
         {phase === 'waiting' ? GuestWaiting() : GuestLive()}
       </main>
-      {toast && <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg pop max-w-[90vw]">{toast}</div>}
+      {toast && <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[70] bg-gray-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg pop max-w-[90vw]">{toast}</div>}
     </div>
   );
   if (sb && !session && !guestMode) return (
@@ -1800,7 +1801,7 @@ function App() {
         </div>
       </nav>
 
-      {toast && <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg pop max-w-[90vw]">{toast}</div>}
+      {toast && <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[70] bg-gray-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg pop max-w-[90vw]">{toast}</div>}
 
       <input ref={scanLibRef} type="file" accept="image/*" className="hidden" onChange={handleScanFile} />
       <input ref={combinedFileRef} type="file" accept="image/*" className="hidden" onChange={handleCombinedFile} />
