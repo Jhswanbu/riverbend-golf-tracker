@@ -1855,15 +1855,23 @@ function App() {
             const countTok = (keys) => { const c = {}; keys.forEach(k => { const t = tokOf(k); if (t) c[t] = (c[t] || 0) + 1; }); return c; };
             const dupT = countTok(keysT), dupG = countTok(keysG);
             const teamTokSet = new Set(keysT.map(tokOf).filter(Boolean));
+            const flagOf = {};
+            keysT.forEach(k => { const t = tokOf(k); if (!t) flagOf[k] = 'PICK A PLAYER'; else if (dupT[t] > 1) flagOf[k] = 'LISTED TWICE'; });
+            keysG.forEach(k => { const t = tokOf(k); if (!t) flagOf[k] = 'PICK A PLAYER'; else if (dupG[t] > 1) flagOf[k] = 'IN TWO GROUPS'; else if (!teamTokSet.has(t)) flagOf[k] = 'NOT ON A TEAM'; });
+            const labelOf = (k) => { const nm = setupImport.names[k]; if (k[0] === 'g') return nm + ' (Group ' + (parseInt(k.slice(1).split('-')[0], 10) + 1) + ')'; return nm + (k.indexOf('t1') === 0 ? ' (Team 1)' : ' (Team 2)'); };
             const problems = [];
             if (!P.team1.length || !P.team2.length) problems.push('Both teams need at least one player.');
-            if (keysT.some(k => !tokOf(k)) || keysG.some(k => !tokOf(k))) problems.push('Every name needs a player picked.');
-            if (Object.values(dupT).some(n => n > 1)) problems.push('A player is listed twice across the teams.');
-            if (Object.values(dupG).some(n => n > 1)) problems.push('A player is in more than one group.');
-            if (keysG.some(k => { const t = tokOf(k); return t && !teamTokSet.has(t); })) problems.push('A group includes someone who is not on either team.');
-            const row = (prefix, e, i, dupMap) => { const key = prefix + i; const v = setupImport.match[key]; const t = tokOf(key); const bad = !!(t && dupMap[t] > 1); return (
-              <div key={key} className={'flex items-center gap-2 rounded-lg px-2.5 py-1.5 ' + (bad ? 'bg-red-50' : 'bg-gray-50')}>
-                <span className="flex-1 font-medium truncate">{e.name}{e.tee ? <span className="ml-1.5 text-[11px] font-bold text-gray-400">{e.tee}</span> : null}</span>
+            const unpicked = [...keysT, ...keysG].filter(k => flagOf[k] === 'PICK A PLAYER');
+            if (unpicked.length) problems.push('Needs a player picked: ' + unpicked.map(labelOf).join(', ') + '.');
+            const dupKeys = keysT.filter(k => flagOf[k] === 'LISTED TWICE');
+            if (dupKeys.length) problems.push('Listed twice across the teams: ' + dupKeys.map(labelOf).join(', ') + '.');
+            const twoGroupKeys = keysG.filter(k => flagOf[k] === 'IN TWO GROUPS');
+            if (twoGroupKeys.length) problems.push('In more than one group: ' + twoGroupKeys.map(labelOf).join(', ') + '.');
+            const strayKeys = keysG.filter(k => flagOf[k] === 'NOT ON A TEAM');
+            if (strayKeys.length) problems.push('In a group but not on a team: ' + strayKeys.map(labelOf).join(', ') + '. If it is the same person as a team row, pick that same player here.');
+            const row = (prefix, e, i, dupMap) => { const key = prefix + i; const v = setupImport.match[key]; const flag = flagOf[key]; return (
+              <div key={key} className={'flex items-center gap-2 rounded-lg px-2.5 py-1.5 ' + (flag ? 'bg-red-50 ring-1 ring-red-300' : 'bg-gray-50')}>
+                <span className="flex-1 font-medium truncate">{e.name}{e.tee ? <span className="ml-1.5 text-[11px] font-bold text-gray-400">{e.tee}</span> : null}{flag ? <span className="ml-1.5 text-[11px] font-bold text-red-700 bg-red-100 rounded-full px-2 py-0.5">{flag}</span> : null}</span>
                 <select value={v == null ? '' : v} onChange={ev => setImportMatch(key, ev.target.value)} className="text-sm border rounded-lg px-1.5 py-1 bg-white max-w-[55%]">
                   <option value="">- pick a player -</option>
                   {rosterSorted.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
