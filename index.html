@@ -807,7 +807,7 @@ function App() {
     const gids = P.groups.map((g, gi) => g.map((e, i) => resolve('g' + gi + '-' + i, e)));
     let nextRoster = [...players, ...created].map(p => teeById[p.id] ? { ...p, tees: teeById[p.id] } : p);
     nextRoster = sortPlayers(nextRoster);
-    if (created.length || Object.keys(teeById).length) { setPlayers(nextRoster); sheetPost(playersPayload(nextRoster)); }
+    if (created.length || Object.keys(teeById).length) setPlayers(nextRoster);
     const byId = Object.fromEntries(nextRoster.map(p => [p.id, p]));
     const team1 = t1ids.map(id => byId[id]).filter(Boolean);
     const team2 = t2ids.map(id => byId[id]).filter(Boolean);
