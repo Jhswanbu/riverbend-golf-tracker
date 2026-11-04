@@ -629,7 +629,7 @@ function App() {
 
   const betEditor = (N) => {
     N = Math.max(1, N);
-    const cfg = sanitizeConfig(settings.betConfiguration, N, settings.numBets);
+    const cfg = (settings.betConfiguration && settings.betConfiguration.length ? settings.betConfiguration : generateBetConfiguration(settings.numBets, N)).map((b, i) => ({ betNumber: i + 1, players: [...(b.players || [])].sort((a, c) => a - c), description: describe(b.players || []) }));
     const setCfg = (next) => setSettings({ ...settings, numBets: next.length, betConfiguration: next.map((b, i) => ({ betNumber: i + 1, players: b.players, description: describe(b.players) })) });
     const toggle = (bi, ball) => {
       const next = cfg.map((b, i) => i !== bi ? b : { ...b, players: b.players.includes(ball) ? b.players.filter(x => x !== ball) : [...b.players, ball].sort((a, c) => a - c) });
@@ -854,9 +854,9 @@ function App() {
     const hasOddPlayers = (team1.length + team2.length) % 2 !== 0;
     const teamWithExtra = team1.length > team2.length ? 'team1' : team2.length > team1.length ? 'team2' : null;
     setTeams({ team1, team2, hasOddPlayers, teamWithExtra });
-    const per = Math.max(1, Math.min(team1.length, team2.length));
-    const cfg = sanitizeConfig(settings.betConfiguration, per, settings.numBets);
-    setSettings(s => ({ ...s, numBets: cfg.length, betConfiguration: cfg }));
+    // E37: team changes never rewrite the bet configuration. The old code
+    // re-sanitized it against min(team sizes) on every swap, which dropped
+    // balls (and whole bets) whenever the teams were briefly uneven.
     if (resetScores) {
       const init = {};
       [...team1, ...team2].forEach(p => { init[p.id] = Array(18).fill(null); });
@@ -1166,7 +1166,7 @@ function App() {
   };
 
   /* ---------- views ---------- */
-  const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = sortPlayers(players.filter(p => p.name.toLowerCase().includes(search.toLowerCase())));
 
   const LockedSetupCard = (
     <div className="card p-5 text-center space-y-3">
@@ -1235,7 +1235,13 @@ function App() {
               <Stepper label="Back 9 hole" value={settings.allBallsBack} min={10} max={18} onChange={v => setSettings({ ...settings, allBallsBack: v })} />
             </div>
           )}
-          <button onClick={() => { createTeams(); setView('teams'); }} className="btn w-full mt-4 bg-fairway-700 hover:bg-fairway-800 text-white font-bold rounded-xl py-3.5 text-lg">🎲 Create teams</button>
+          {hasTeams && [...teams.team1, ...teams.team2].length === selected.length && [...teams.team1, ...teams.team2].every(p => selected.includes(p.id)) ? (<>
+            <button onClick={() => setView('teams')} className="btn w-full mt-4 bg-fairway-700 hover:bg-fairway-800 text-white font-bold rounded-xl py-3.5 text-lg">✓ Keep these teams — back to Teams</button>
+            <button onClick={() => { if (confirm('Re-draw teams? The current teams will be replaced and scores cleared.')) { createTeams(); setView('teams'); } }} className="btn w-full mt-2 bg-gray-100 font-semibold rounded-xl py-3">🎲 Re-draw teams instead</button>
+            <p className="text-xs text-gray-500 mt-2">Changing the number of bets or which balls count only changes the bets — your teams stay exactly as they are.</p>
+          </>) : (
+            <button onClick={() => { createTeams(); setView('teams'); }} className="btn w-full mt-4 bg-fairway-700 hover:bg-fairway-800 text-white font-bold rounded-xl py-3.5 text-lg">🎲 Create teams</button>
+          )}
         </div>
       ) : (
         <div className="text-center text-sm text-gray-500 py-2">Select at least 4 players to set up a game.</div>
@@ -1250,7 +1256,7 @@ function App() {
       <div className={`font-bold mb-2 ${color === 'blue' ? 'text-sky-700' : 'text-emerald-700'}`}>{label} <span className="text-xs font-medium opacity-70">({teams[id].length})</span></div>
       {teamAvgIndex(teams[id]) !== null && <div className="text-xs font-semibold text-gray-500 mb-1">Avg index {teamAvgIndex(teams[id]).toFixed(1)}</div>}
       <div className="space-y-2">
-        {teams[id].map(p => (
+        {sortPlayers(teams[id]).map(p => (
           <button key={p.id} onClick={() => swapPlayer(p.id, id)} className="btn w-full text-left bg-white rounded-xl px-3 py-2.5 shadow-sm font-medium flex justify-between items-center">
             <span className="truncate">{p.name}</span>{p.handicapIndex != null && <span className="text-xs font-semibold text-gray-400">{Number(p.handicapIndex).toFixed(1)}</span>}<span className="text-gray-300">⇄</span>
           </button>
