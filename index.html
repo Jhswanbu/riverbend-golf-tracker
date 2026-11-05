@@ -1061,15 +1061,42 @@ function App() {
     setScanBusy(false);
   };
 
+  const mergeScanRows = (intoIdx, fromIdx) => {
+    setScanReview(sr => {
+      if (!sr || intoIdx === fromIdx) return sr;
+      const rows = sr.rows.slice();
+      const into = { ...rows[intoIdx] };
+      const from = rows[fromIdx];
+      const unsure = new Set([...(into.unsure || []), ...(from.unsure || [])]);
+      into.scores = into.scores.map((v, i) => {
+        const f = from.scores[i];
+        if (v == null) return f;
+        if (f != null && f !== v) unsure.add(i + 1);
+        return v;
+      });
+      into.out = into.out != null ? into.out : (from.out != null ? from.out : null);
+      into.in = into.in != null ? into.in : (from.in != null ? from.in : null);
+      into.tot = into.tot != null ? into.tot : (from.tot != null ? from.tot : null);
+      into.unsure = [...unsure].sort((a, b) => a - b);
+      if (!into.playerId && from.playerId) into.playerId = from.playerId;
+      if (!into.name && from.name) into.name = from.name;
+      into.confirmed = false;
+      rows[intoIdx] = into;
+      rows.splice(fromIdx, 1);
+      return { ...sr, rows, mergeFrom: null };
+    });
+  };
+
   const applyScan = () => {
     if (!scanReview) return;
-    const ids = scanReview.rows.map(r => r.playerId).filter(Boolean);
+    const activeRows = scanReview.rows.filter(r => !r.skip);
+    const ids = activeRows.map(r => r.playerId).filter(Boolean);
     if (ids.some((v, i) => ids.indexOf(v) !== i)) { flash('Two rows are assigned to the same player - fix before applying'); return; }
-    if (scanReview.rows.some(r => !r.playerId)) { flash('Every row needs a player before applying'); return; }
-    if (scanReview.rows.some(r => !r.confirmed)) { flash('Confirm every row before applying'); return; }
+    if (activeRows.some(r => !r.playerId)) { flash('Every row needs a player before applying - or skip the row'); return; }
+    if (activeRows.some(r => !r.confirmed)) { flash('Confirm every row before applying'); return; }
     setScores(prev => {
       const next = { ...prev };
-      scanReview.rows.forEach(r => {
+      activeRows.forEach(r => {
         if (!r.playerId) return;
         const cur = (next[r.playerId] || Array(18).fill(null)).slice();
         r.scores.forEach((v, i) => { if (v != null) cur[i] = v; });
@@ -1967,7 +1994,7 @@ function App() {
       {scanBusy && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 text-center font-semibold text-gray-700">📷 Reading scorecard...</div></div>}
       {scanReview && (
         <Modal title="Review scanned scores" onClose={() => setScanReview(null)}>
-          <p className="text-sm text-gray-500 mb-3">Confirm each row is the right player, check the flagged cells against the card, then apply. Blank means not read.</p>
+          <p className="text-sm text-gray-500 mb-3">Confirm each row is the right player, check the flagged cells against the card, then apply. Blank means not read. If one player's scores arrive split across two rows, merge them; a row you do not need can be skipped.</p>
           {scanReview.photo && <img src={scanReview.photo} alt="Scanned scorecard" className="w-full max-h-72 object-contain rounded-xl border mb-3 bg-gray-50" />}
           <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
             {scanReview.rows.map((r, ri) => {
@@ -1976,10 +2003,14 @@ function App() {
               const sus = mismatch ? scanSuspects(r) : [];
               const selPlayer = players.find(p => p.id === r.playerId);
               return (
-              <div key={ri} className="border rounded-xl p-2.5">
+              <div key={ri} className={'border rounded-xl p-2.5' + (r.skip ? ' opacity-50' : '')}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm text-gray-700">Card reads: <b>{r.name || '(no name)'}</b></span>
-                  {!r.playerId ? <span className="text-[11px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">NEEDS A PLAYER</span> : !r.confirmed ? <span className="text-[11px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">UNCONFIRMED</span> : <span className="text-[11px] font-bold text-fairway-700 bg-green-50 rounded-full px-2 py-0.5">{'\u2713'} CONFIRMED</span>}
+                  {r.skip ? <span className="text-[11px] font-bold text-gray-500 bg-gray-200 rounded-full px-2 py-0.5">SKIPPED</span> : !r.playerId ? <span className="text-[11px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">NEEDS A PLAYER</span> : !r.confirmed ? <span className="text-[11px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">UNCONFIRMED</span> : <span className="text-[11px] font-bold text-fairway-700 bg-green-50 rounded-full px-2 py-0.5">{'\u2713'} CONFIRMED</span>}
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  {scanReview.mergeFrom === ri ? <button onClick={() => setScanReview(sr => ({ ...sr, mergeFrom: null }))} className="btn bg-violet-600 text-white text-[11px] font-bold rounded-full px-2.5 py-1">MERGE SOURCE - tap to cancel</button> : scanReview.mergeFrom != null ? <button onClick={() => mergeScanRows(ri, scanReview.mergeFrom)} className="btn bg-violet-600 text-white text-[11px] font-bold rounded-full px-2.5 py-1">Merge marked row into this one</button> : <button onClick={() => setScanReview(sr => ({ ...sr, mergeFrom: ri }))} className="btn bg-violet-50 text-violet-700 border border-violet-300 text-[11px] font-bold rounded-full px-2.5 py-1">Merge with another row</button>}
+                  <button onClick={() => setScanReview(sr => ({ ...sr, rows: sr.rows.map((x, xi) => xi === ri ? { ...x, skip: !x.skip } : x) }))} className="btn ml-auto bg-gray-100 text-gray-600 text-[11px] font-bold rounded-full px-2.5 py-1">{r.skip ? 'Unskip row' : 'Skip this row'}</button>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <select value={r.playerId} onChange={e => { const v = e.target.value === '' ? '' : Number(e.target.value); setScanReview(sr => ({ ...sr, rows: sr.rows.map((x, xi) => xi === ri ? { ...x, playerId: v, confirmed: false } : x) })); }} className="border rounded-lg px-2 py-1.5 text-sm font-semibold flex-1 min-w-0">
@@ -2002,16 +2033,18 @@ function App() {
             })}
           </div>
           {(() => {
-            const ids = scanReview.rows.map(r => r.playerId).filter(Boolean);
+            const activeRows = scanReview.rows.filter(r => !r.skip);
+            const ids = activeRows.map(r => r.playerId).filter(Boolean);
             const dup = ids.some((v, i) => ids.indexOf(v) !== i);
-            const unassigned = scanReview.rows.filter(r => !r.playerId).length;
-            const unconfirmed = scanReview.rows.filter(r => r.playerId && !r.confirmed).length;
+            const unassigned = activeRows.filter(r => !r.playerId).length;
+            const unconfirmed = activeRows.filter(r => r.playerId && !r.confirmed).length;
             const missing = (scanReview.targets || []).filter(t => !ids.includes(t.id));
-            const ready = !dup && unassigned === 0 && unconfirmed === 0;
+            const ready = !dup && unassigned === 0 && unconfirmed === 0 && activeRows.length > 0;
             return (<>
               {dup ? <div className="text-sm text-red-600 font-semibold mt-3">Two rows are assigned to the same player - fix the assignments before applying.</div> : null}
+              {!dup && unassigned ? <div className="text-sm text-amber-700 font-semibold mt-3">A row still needs a player - assign it, merge it into its other half, or skip it.</div> : null}
               {missing.length ? <div className="text-sm text-amber-700 font-semibold mt-3">No row read for: {missing.map(t => t.name).join(', ')}. If they are on this card, rescan or enter their scores by hand.</div> : null}
-              <button onClick={applyScan} disabled={!ready} className={'btn w-full mt-4 rounded-xl py-3 font-bold ' + (ready ? 'bg-fairway-700 text-white' : 'bg-gray-200 text-gray-500')}>{ready ? 'Apply scores' : 'Apply scores (' + scanReview.rows.filter(r => r.confirmed).length + ' of ' + scanReview.rows.length + ' rows confirmed)'}</button>
+              <button onClick={applyScan} disabled={!ready} className={'btn w-full mt-4 rounded-xl py-3 font-bold ' + (ready ? 'bg-fairway-700 text-white' : 'bg-gray-200 text-gray-500')}>{ready ? 'Apply scores' : 'Apply scores (' + activeRows.filter(r => r.confirmed).length + ' of ' + activeRows.length + ' rows confirmed)'}</button>
             </>);
           })()}
           <button onClick={() => setScanReview(null)} className="btn w-full mt-2 bg-gray-100 rounded-xl py-2.5 text-sm font-semibold">Cancel</button>
