@@ -437,6 +437,7 @@ function App() {
   const scanLibRef = useRef(null);
   const [combinedCheck, setCombinedCheck] = useState(null);
   const combinedFileRef = useRef(null);
+  const printoutFileRef = useRef(null);
   const [setupImport, setSetupImport] = useState(null);
   const [profileId, setProfileId] = useState(null);
   const [myPlayerId, setMyPlayerId] = useState(null);
@@ -1076,8 +1077,12 @@ function App() {
       });
       return next;
     });
+    const appliedReview = scanReview;
     setScanReview(null);
     flash('Scores applied from scorecard');
+    if (appliedReview.cardBets && appliedReview.cardBets.length) {
+      setCombinedCheck({ bets: appliedReview.cardBets, allBallsFront: appliedReview.cardAllBallsFront, allBallsBack: appliedReview.cardAllBallsBack, abFrontHole: appliedReview.cardAbFrontHole, abBackHole: appliedReview.cardAbBackHole, names: appliedReview.cardNames || [], team: appliedReview.teamGuess || 'team1', photo: appliedReview.photo });
+    }
   };
 
   const handleCombinedFile = async (e) => {
@@ -1095,6 +1100,37 @@ function App() {
       const bets = (parsed.bets || []).map(row => Array.from({ length: 18 }, (_, i) => { const v = (row || [])[i]; return (typeof v === 'number' && v >= 2 && v <= 30) ? v : null; }));
       if (bets.length < 3) throw new Error('The bets table could not be read from that photo');
       setCombinedCheck({ bets, allBallsFront: (typeof parsed.allBallsFront === 'number' ? parsed.allBallsFront : null), allBallsBack: (typeof parsed.allBallsBack === 'number' ? parsed.allBallsBack : null), names: parsed.names || [], team: 'team1', photo: dataUrl });
+    } catch (err) { flash('Scan failed: ' + err.message); }
+    setScanBusy(false);
+  };
+
+  const handlePrintoutFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!session) { flash('Sign in to use scorecard scanning'); return; }
+    const targets = players.map(p => ({ id: p.id, name: p.name }));
+    setScanBusy(true); flash('Reading printed team sheet...');
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const { data: parsed, error: fnErr } = await sb.functions.invoke('scan-scorecard', { body: { imageDataUrl: dataUrl, mode: 'printout', targets: targets.map(t => ({ id: t.id, name: t.name })), pars: COURSE.holes.map(h => h.par) } });
+      if (fnErr) throw new Error('Scan failed - are you signed in?');
+      if (!parsed) throw new Error('The scan service returned nothing');
+      if (parsed.error) throw new Error(parsed.error);
+      const rawRows = parsed.rows || [];
+      const usedPids = new Set(rawRows.map(r => r.playerId).filter(id => id != null && targets.some(t => t.id === id)));
+      const rows = rawRows.map(r => {
+        let pid = (r.playerId != null && targets.some(t => t.id === r.playerId)) ? r.playerId : '';
+        if (!pid && r.name) { const rn = String(r.name).toLowerCase(); const free = targets.filter(t => !usedPids.has(t.id)); const m = free.find(t => t.name.toLowerCase() === rn) || free.find(t => t.name.toLowerCase().startsWith(rn) || rn.startsWith(t.name.toLowerCase().split(' ')[0])); if (m) { pid = m.id; usedPids.add(m.id); } }
+        return { playerId: pid, name: r.name || '', scores: Array.from({ length: 18 }, (_, i) => { const v = (r.scores || [])[i]; return (typeof v === 'number' && v >= 1 && v <= 20) ? v : null; }), unsure: r.unsure || [], out: (r.out === undefined ? null : r.out), in: (r.in === undefined ? null : r.in), tot: null, confirmed: false };
+      });
+      if (!rows.length) throw new Error('No player rows could be read from that photo');
+      const t1ids = (teams.team1 || []).map(p => p.id), t2ids = (teams.team2 || []).map(p => p.id);
+      const inT1 = rows.filter(r => t1ids.includes(r.playerId)).length, inT2 = rows.filter(r => t2ids.includes(r.playerId)).length;
+      const teamGuess = inT2 > inT1 ? 'team2' : 'team1';
+      const teamTargets = (inT1 + inT2) ? (teamGuess === 'team2' ? teams.team2 : teams.team1).map(p => ({ id: p.id, name: p.name })) : rows.filter(r => r.playerId).map(r => ({ id: r.playerId, name: r.name }));
+      const cardBets = (parsed.bets || []).map(row => Array.from({ length: 18 }, (_, i) => { const v = (row || [])[i]; return (typeof v === 'number' && v >= 2 && v <= 30) ? v : null; })).filter(row => row.some(v => v != null));
+      setScanReview({ rows, photo: dataUrl, targets: teamTargets, cardBets, cardAllBallsFront: (typeof parsed.allBallsFront === 'number' ? parsed.allBallsFront : null), cardAllBallsBack: (typeof parsed.allBallsBack === 'number' ? parsed.allBallsBack : null), cardAbFrontHole: (typeof parsed.allBallsFrontHole === 'number' ? parsed.allBallsFrontHole : null), cardAbBackHole: (typeof parsed.allBallsBackHole === 'number' ? parsed.allBallsBackHole : null), cardNames: parsed.names || [], teamGuess });
     } catch (err) { flash('Scan failed: ' + err.message); }
     setScanBusy(false);
   };
@@ -1330,6 +1366,9 @@ function App() {
     const CombinedButton = (!session || isAdminUser) ? (
       <button onClick={() => { if (!session) { flash('Sign in to use scorecard scanning'); return; } if (combinedFileRef.current) combinedFileRef.current.click(); }} className="btn w-full bg-white border-2 border-dashed border-sky-600 text-sky-800 font-bold rounded-xl py-3">🧾 Check Combined Card</button>
     ) : null;
+    const PrintoutButton = (!session || isAdminUser) ? (
+      <button onClick={() => { if (!session) { flash('Sign in to use scorecard scanning'); return; } if (printoutFileRef.current) printoutFileRef.current.click(); }} className="btn w-full bg-white border-2 border-dashed border-violet-600 text-violet-800 font-bold rounded-xl py-3">🖨️ Scan Printed Team Sheet</button>
+    ) : null;
     const ModeSwitch = <div className="space-y-3">{ModeToggle}{GroupTabs}</div>;
 
     const StatusCard = (
@@ -1357,6 +1396,7 @@ function App() {
           {ModeSwitch}
           {ScanButton}
           {CombinedButton}
+          {PrintoutButton}
           <div className="card p-3 overflow-x-auto">
             <table className="text-sm border-collapse min-w-full">
               <thead>
@@ -1417,6 +1457,7 @@ function App() {
         {ModeSwitch}
         {ScanButton}
         {CombinedButton}
+        {PrintoutButton}
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
           {COURSE.holes.map(x => {
             const done = groupPlayers.every(p => sc(p.id, x.hole - 1) !== null);
@@ -1827,6 +1868,7 @@ function App() {
 
       <input ref={scanLibRef} type="file" accept="image/*" className="hidden" onChange={handleScanFile} />
       <input ref={combinedFileRef} type="file" accept="image/*" className="hidden" onChange={handleCombinedFile} />
+      <input ref={printoutFileRef} type="file" accept="image/*" className="hidden" onChange={handlePrintoutFile} />
       <input ref={photoFileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoFile} />
       {combinedCheck && (
         <Modal title="Combined card check" onClose={() => setCombinedCheck(null)}>
@@ -1848,10 +1890,12 @@ function App() {
               checked++;
               if (v !== card) problems.push('Bet ' + (bi + 1) + ', hole ' + (h + 1) + ': card says ' + card + ', entered scores add to ' + v);
             }));
-            const abF = teamAllBalls(combinedCheck.team, settings.allBallsFront || 1);
-            const abB = teamAllBalls(combinedCheck.team, settings.allBallsBack || 11);
-            if (abF != null && combinedCheck.allBallsFront != null && abF !== combinedCheck.allBallsFront) problems.push('All balls, hole ' + (settings.allBallsFront || 1) + ': card says ' + combinedCheck.allBallsFront + ', entered scores add to ' + abF);
-            if (abB != null && combinedCheck.allBallsBack != null && abB !== combinedCheck.allBallsBack) problems.push('All balls, hole ' + (settings.allBallsBack || 11) + ': card says ' + combinedCheck.allBallsBack + ', entered scores add to ' + abB);
+            const abFH = combinedCheck.abFrontHole || settings.allBallsFront || 1;
+            const abBH = combinedCheck.abBackHole || settings.allBallsBack || 11;
+            const abF = teamAllBalls(combinedCheck.team, abFH);
+            const abB = teamAllBalls(combinedCheck.team, abBH);
+            if (abF != null && combinedCheck.allBallsFront != null && abF !== combinedCheck.allBallsFront) problems.push('All balls, hole ' + abFH + ': card says ' + combinedCheck.allBallsFront + ', entered scores add to ' + abF);
+            if (abB != null && combinedCheck.allBallsBack != null && abB !== combinedCheck.allBallsBack) problems.push('All balls, hole ' + abBH + ': card says ' + combinedCheck.allBallsBack + ', entered scores add to ' + abB);
             if (!checked) return <div className="text-sm text-amber-700 font-semibold">Not enough scores are entered for this team yet to check anything.</div>;
             if (!problems.length) return <div className="text-sm text-fairway-700 font-semibold">{'\u2713'} All {checked} bet totals match the combined card.</div>;
             return (<div className="space-y-1.5">{problems.map((p, i) => <div key={i} className="text-sm text-red-700 font-semibold bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">{p}</div>)}</div>);
@@ -1995,7 +2039,7 @@ function App() {
           )}
 
           <h3 className="font-bold text-gray-800 mt-5 mb-1">Scorecard scanning (AI)</h3>
-          <p className="text-xs text-gray-500 mb-3">Built in for every signed-in player: in the Game view, tap Use Scorecard Photo - take a picture or pick one from your library - then review the read and apply. The photo is read by the club's server, so no key or setup is needed on your phone.</p>
+          <p className="text-xs text-gray-500 mb-3">Built in for every signed-in player: in the Game view, tap Use Scorecard Photo - take a picture or pick one from your library - then review the read and apply. The photo is read by the club's server, so no key or setup is needed on your phone. For the captain's printed team spreadsheet, use Scan Printed Team Sheet instead - it reads that sheet's player rows and checks its own bets table against the scores.</p>
 
           <h3 className="font-bold text-gray-800 mt-5 mb-2">Backup</h3>
           <div className="grid grid-cols-2 gap-2">
