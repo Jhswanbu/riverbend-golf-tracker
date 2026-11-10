@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Riverbend Scorekeeper</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="RB Scorekeeper">
+<meta name="theme-color" content="#14532d">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2314532d'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle'%3E%E2%9B%B3%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='80' font-size='80'%3E%E2%9B%B3%3C/text%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 16px; background: #f4f6f4; color: #1a2e1a; }
+  main { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 4px 0 2px; color: #14532d; }
+  h2 { font-size: 1.15rem; margin: 18px 0 8px; color: #14532d; }
+  h3 { font-size: 1.02rem; margin: 14px 0 6px; color: #14532d; }
+  p.note { color: #445; font-size: .95rem; line-height: 1.45; }
+  .card { background: #fff; border: 1px solid #d8e2d8; border-radius: 14px; padding: 16px; margin: 12px 0; }
+  input[type=email], input[type=password], input[type=date], input[type=number], select {
+    font-size: 16px; padding: 10px; border: 1px solid #b9cbb9; border-radius: 10px; background: #fff; width: 100%;
+  }
+  label.f { display: block; font-size: .85rem; font-weight: 600; color: #37503a; margin: 10px 0 4px; }
+  button { font-size: 17px; font-weight: 700; width: 100%; min-height: 54px; padding: 13px; border: 0; border-radius: 12px; background: #14532d; color: #fff; cursor: pointer; margin-top: 12px; -webkit-tap-highlight-color: transparent; }
+  button:disabled { background: #9db8a2; }
+  button.secondary { background: #fff; color: #14532d; border: 2px solid #14532d; }
+  button.small { width: auto; min-height: 40px; padding: 8px 14px; font-size: 15px; margin-top: 0; }
+  button:active { filter: brightness(1.15); }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { padding: 7px 5px; border-bottom: 1px solid #e3eae3; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  .warn { background: #fdf3e0; border: 1px solid #e5c26b; border-radius: 10px; padding: 12px; font-size: .95rem; }
+  .blockerr { background: #fdeaea; border: 1px solid #d66; border-radius: 10px; padding: 12px; font-size: .95rem; }
+  .msg { white-space: pre-wrap; border-radius: 10px; padding: 14px; font-size: 1rem; line-height: 1.45; display: none; }
+  .msg.ok { display: block; background: #e7f6e9; border: 1px solid #57a465; }
+  .msg.err { display: block; background: #fdeaea; border: 1px solid #d66; }
+  .neg { color: #c0392b; }
+  .team { font-weight: 700; margin-top: 10px; }
+  /* upload tab (v3): file picker + partial-round badge, from the submit page */
+  label.pick { display: block; }
+  input[type=file] { font-size: 17px; width: 100%; padding: 18px; min-height: 64px; border: 2px dashed #7aa87f; border-radius: 12px; background: #f0f7f0; }
+  .badge { display: inline-block; background: #fdf3e0; border: 1px solid #e5c26b; color: #7a5410; border-radius: 999px; padding: 1px 9px; font-size: .8rem; font-weight: 700; margin-left: 6px; vertical-align: 2px; }
+  .tabs { display: flex; gap: 8px; margin: 14px 0 4px; }
+  .tabs button { flex: 1; min-height: 48px; margin-top: 0; background: #e3eae3; color: #14532d; }
+  .tabs button.on { background: #14532d; color: #fff; }
+  .who { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .who .em { font-size: .9rem; color: #445; overflow: hidden; text-overflow: ellipsis; }
+  /* roster */
+  .prow { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #eef3ee; }
+  .prow:last-child { border-bottom: 0; }
+  .pname { flex: 1; font-weight: 600; font-size: 16px; padding: 10px 6px; text-align: left; background: none; border: 0; color: #1a2e1a; cursor: pointer; min-height: 44px; margin: 0; width: auto; }
+  .chip { flex: 0 0 92px; min-height: 44px; border-radius: 10px; border: 2px solid #b9cbb9; background: #f4f6f4; color: #667; font-size: 15px; font-weight: 700; cursor: pointer; margin: 0; width: auto; padding: 8px 4px; }
+  .chip.t1 { background: #14532d; border-color: #14532d; color: #fff; }
+  .chip.t2 { background: #8a5a12; border-color: #8a5a12; color: #fff; }
+  .gsel { flex: 0 0 104px; }
+  .gsel select { padding: 8px; min-height: 44px; }
+  .tsel { flex: 0 0 62px; }
+  .tsel select { padding: 8px; min-height: 44px; }
+  /* bets editor */
+  .betrow { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .betrow .bl { flex: 0 0 52px; font-weight: 700; font-size: .9rem; color: #37503a; }
+  .betrow select { flex: 1; min-height: 44px; }
+  .betrow .del { flex: 0 0 44px; width: 44px; min-height: 44px; background: #fdeaea; color: #a33; border: 1px solid #d66; margin: 0; padding: 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .tog { display: flex; align-items: center; gap: 10px; margin: 12px 0 2px; font-weight: 600; }
+  .tog input { width: 26px; height: 26px; flex: 0 0 26px; }
+  /* score grid */
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.grid { font-size: 14px; min-width: 760px; }
+  table.grid th, table.grid td { text-align: center; padding: 4px 2px; }
+  table.grid th:first-child, table.grid td:first-child { text-align: left; position: sticky; left: 0; background: #fff; min-width: 104px; font-weight: 600; }
+  table.grid input { width: 42px; padding: 8px 2px; text-align: center; font-size: 16px; border: 1px solid #cfdccf; border-radius: 8px; }
+  table.grid input.par { width: 42px; background: #f0f7f0; font-weight: 700; }
+  table.grid .tot { font-weight: 700; }
+  table.grid tr.ttot td { background: #eef5ee; font-weight: 700; }
+  /* scorecard highlights (v2): a ring around birdies, a double ring for
+     eagles, and a warm tint on the All Balls hole columns. Gold is the
+     traditional scorecard pencil color for circling birdies. */
+  table.grid input.bird { border: 2px solid #b8860b; border-radius: 50%; font-weight: 700; }
+  table.grid input.eag { border: 2px solid #b8860b; border-radius: 50%; font-weight: 700; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #b8860b; }
+  table.grid td.abcol, table.grid th.abcol { background: #fdf3d7; }
+  table.grid th.abh::after { content: " AB"; font-size: 9px; color: #8a5a12; font-weight: 700; }
+  .circ { display: inline-block; min-width: 25px; line-height: 25px; padding: 0 2px; border: 2px solid #b8860b; border-radius: 50%; text-align: center; font-weight: 700; }
+  .circ.eag { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #b8860b; }
+  /* setup card (v2): a clean, shareable picture of the day's setup */
+  .setupcard { font-size: 17px; line-height: 1.5; }
+  .setupcard .sc-date { font-size: 1.35rem; font-weight: 800; color: #14532d; margin-bottom: 2px; }
+  .setupcard .sc-meta { font-size: 1.02rem; color: #22352a; margin: 2px 0; }
+  .setupcard .sc-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 12px; }
+  .setupcard .sc-cols h3 { font-size: 1.12rem; margin: 0 0 6px; padding-bottom: 4px; border-bottom: 3px solid #14532d; }
+  .setupcard .sc-cols .t2h { border-bottom-color: #8a5a12; }
+  .setupcard ul { list-style: none; margin: 0; padding: 0; }
+  .setupcard li { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid #eef3ee; font-weight: 600; }
+  .setupcard li .g { flex: 0 0 auto; font-weight: 700; color: #fff; background: #5b7a5f; border-radius: 999px; padding: 0 10px; font-size: .82rem; line-height: 1.7; }
+  .setupcard li .pills { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
+  .setupcard li .t { flex: 0 0 auto; font-weight: 700; color: #14532d; background: #e3eae3; border: 1px solid #b9cbb9; border-radius: 999px; padding: 0 9px; font-size: .82rem; line-height: 1.7; }
+  .setupcard .sc-groups { margin-top: 14px; font-size: 1rem; }
+  .setupcard .sc-groups div { padding: 3px 0; border-bottom: 1px solid #eef3ee; }
+  .setupcard .sc-groups b { color: #14532d; }
+  @media (max-width: 560px) { .setupcard .sc-cols { grid-template-columns: 1fr; } }
+  .pastitem { border: 1px solid #d8e2d8; border-radius: 12px; padding: 12px; margin: 10px 0; background: #fff; cursor: pointer; }
+  .pastitem .ph { display: flex; justify-content: space-between; font-weight: 700; }
+  .modal { position: fixed; inset: 0; background: rgba(10,25,12,.55); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal.on { display: flex; }
+  .modal .box { background: #fff; border-radius: 14px; padding: 18px; max-width: 520px; width: 100%; max-height: 86vh; overflow-y: auto; }
+  @media (max-width: 420px) { body { padding: 12px; } .gsel { flex-basis: 92px; } .tsel { flex-basis: 54px; } .chip { flex-basis: 80px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>⛳ Riverbend Scorekeeper</h1>
+  <p class="note">The whole field's scores, entered like the spreadsheet. <strong>Anyone can enter and submit a round — no login needed</strong>; it counts right away, and an admin is alerted for every submission. Admins and scorekeepers sign in to manage rounds. No live scoring.</p>
+
+  <!-- ADMIN SIGN-IN (v7): shown when signed OUT. The app itself is open —
+       entering scores, uploading a spreadsheet, the setup card, and the
+       season tally all work without an account. Signing in is only for
+       managing rounds. -->
+  <div id="adminCard" class="card" style="display:none">
+    <h2 style="margin-top:0">Admin sign-in</h2>
+    <p class="note" style="margin-top:0">You don't need an account to enter scores. Sign in (admins and scorekeepers) for <strong>Past Rounds</strong>, <strong>adding players</strong>, and <strong>removing rounds</strong>.</p>
+    <label class="f" for="liEmail">Email</label>
+    <input type="email" id="liEmail" autocomplete="username" placeholder="you@example.com">
+    <label class="f" for="liPass">Password</label>
+    <input type="password" id="liPass" autocomplete="current-password" placeholder="Password">
+    <button id="btnLogin">Sign in</button>
+    <div id="loginMsg" class="msg" role="status"></div>
+  </div>
+
+  <!-- APP SHELL (always present in v7; signed-out visitors get the open tabs) -->
+  <div id="appShell">
+    <div class="card" id="whoBar" style="padding:10px 16px;display:none">
+      <div class="who">
+        <span class="em" id="whoEmail"></span>
+        <span class="em" id="whoRole"></span>
+        <button id="btnLogout" class="secondary small">Sign out</button>
+      </div>
+    </div>
+    <div id="roNote"></div>
+    <div id="saveOk" class="msg ok" role="status" style="margin:12px 0"></div>
+
+    <div class="tabs">
+      <button id="tabEnter" class="on">Enter Scores</button>
+      <button id="tabUpload">Upload Spreadsheet</button>
+      <button id="tabSetup">Setup Card</button>
+      <button id="tabTally">Season Tally</button>
+      <button id="tabPast">Past Rounds</button>
+    </div>
+
+    <!-- ENTER SCORES -->
+    <section id="viewEnter">
+      <div class="card">
+        <h2 style="margin-top:0">1 · Setup</h2>
+        <label class="f" for="inDate">Round date</label>
+        <input type="date" id="inDate">
+        <p class="note">Tap a player's name (or the chip) to cycle: <strong>— → Team 1 → Team 2 → —</strong>. Pick a tee-time group once a player is assigned, and check the tees they're playing from — <strong>W</strong> unless they're moved back to the Blues, Combos, or Reds. A tee you change here is remembered on that player's record. If a player leaves early, just leave the holes they didn't play blank — blank holes are recorded as left early, and they still owe (or collect) the full team amount for the round. Saving asks you to confirm any blanks before the round is recorded.</p>
+        <div id="roster"></div>
+        <p class="team" id="teamCounts" style="font-weight:700;margin-top:10px"></p>
+        <div id="addPlayerBox" style="display:none;border-top:1px solid #e3eae3;margin-top:12px;padding-top:4px">
+          <h3>Add a player</h3>
+          <p class="note" style="margin-top:0">Someone new playing today? Add them to the roster here — they can be put on a team right away. (Admins and scorekeepers only.)</p>
+          <div class="grid2">
+            <div><label class="f" for="npName">New player name</label><input type="text" id="npName" placeholder="First Last" autocomplete="off"></div>
+            <div><label class="f" for="npTees">Tees</label><select id="npTees"><option value="White" selected>White</option><option value="Blue">Blue</option><option value="Combo">Combo</option><option value="Red">Red</option></select></div>
+          </div>
+          <button id="btnAddPlayer" class="secondary">Add player</button>
+          <div id="npMsg" class="msg" role="status"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0">2 · Bets &amp; settings</h2>
+        <div class="grid2">
+          <div><label class="f" for="inBetAmt">Bet amount ($)</label><input type="number" id="inBetAmt" inputmode="decimal" min="0" step="1"></div>
+          <div><label class="f">Bets</label><button id="btnAddBet" class="secondary small" style="width:100%;min-height:44px">+ Add bet</button></div>
+        </div>
+        <div id="betRows"></div>
+        <button id="btnResetBets" class="secondary small" style="width:100%;min-height:44px;margin-top:4px">Reset bets to team-size defaults</button>
+        <p class="note">Until you change a bet yourself, the defaults follow the team sizes — pairs of balls (1-2, 3-4, …) the smaller team can actually cover, so the app never invents a bet that doesn't exist. Once you edit the bets, team changes leave them alone.</p>
+        <label class="tog"><input type="checkbox" id="inBirdie"> Birdie bonus</label>
+        <label class="tog"><input type="checkbox" id="inAllBalls"> All Balls</label>
+        <div class="grid2" id="abHoles">
+          <div><label class="f" for="inAbF">All Balls — front hole (1-9)</label><input type="number" id="inAbF" inputmode="numeric" min="1" max="9"></div>
+          <div><label class="f" for="inAbB">All Balls — back hole (10-18)</label><input type="number" id="inAbB" inputmode="numeric" min="10" max="18"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0">3 · Scores</h2>
+        <p class="note" style="margin-top:0">Par row is editable — change it when the group plays a different course.</p>
+        <div id="grids"></div>
+      </div>
+
+      <div class="card" id="resultsCard">
+        <h2 style="margin-top:0">4 · Results</h2>
+        <div id="results"><p class="note">Results appear here once every assigned player has a full card — or a partial card (blank holes = left early).</p></div>
+        <button id="btnSave">Save round</button>
+        <div id="saveMsg" class="msg" role="status"></div>
+      </div>
+    </section>
+
+    <!-- UPLOAD SPREADSHEET -->
+    <section id="viewUpload" style="display:none">
+      <h2>Upload Spreadsheet</h2>
+      <div class="card" style="margin-top:0">
+        <p class="note" style="margin-top:0"><strong>First:</strong> in Excel, enter the scores and <strong>Save the file</strong> (so the totals are written), then pick that saved file here. On an iPad, work from the plain <strong>.xlsx</strong> copy — saving an .xlsm from iPad Excel strips its macros (and its desktop button), so never save over the .xlsm master.</p>
+        <p class="note">The file is read <strong>on this device only</strong> — just the scores are sent to the tracker database, exactly like the standalone submit page.</p>
+        <label class="pick">
+          <input type="file" id="upFile" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12">
+        </label>
+        <div id="upPreview"></div>
+        <button id="upSubmit" disabled>Submit round</button>
+        <div id="upResult" class="msg" role="status"></div>
+      </div>
+    </section>
+
+    <!-- SETUP CARD -->
+    <section id="viewSetup" style="display:none">
+      <h2>Setup Card</h2>
+      <p class="note">The day's setup on one clean card — teams, groups, bets, and the All Balls holes. Take a picture of it to share with the group.</p>
+      <div id="setupCard"></div>
+    </section>
+
+    <!-- SEASON TALLY -->
+    <section id="viewTally" style="display:none">
+      <h2>Season Tally</h2>
+      <div class="card" style="margin-top:0"><div id="tally"></div></div>
+    </section>
+
+    <!-- PAST ROUNDS -->
+    <section id="viewPast" style="display:none">
+      <h2>Past Rounds</h2>
+      <div id="pastList"></div>
+    </section>
+  </div>
+
+  <!-- CONFIRM MODAL -->
+  <div id="confirmModal" class="modal">
+    <div class="box">
+      <h2 style="margin-top:0">Save this round?</h2>
+      <div id="confirmBody"></div>
+      <button id="btnConfirmSave">Yes — save round</button>
+      <button id="btnCancelSave" class="secondary">Not yet</button>
+      <div id="confirmMsg" class="msg" role="status"></div>
+    </div>
+  </div>
+
+  <!-- REMOVE ROUND MODAL (v7, admins/scorekeepers only) -->
+  <div id="removeModal" class="modal">
+    <div class="box">
+      <h2 style="margin-top:0">Remove this round?</h2>
+      <div id="removeBody"></div>
+      <button id="btnConfirmRemove">Yes — remove round</button>
+      <button id="btnCancelRemove" class="secondary">Keep it</button>
+      <div id="removeMsg" class="msg" role="status"></div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+"use strict";
+var SUPABASE_URL = "https://jlyrvbhodrxzixbvznoz.supabase.co";
+var SUPABASE_KEY = "sb_publishable_fCfYklNBkWS337FSYVr7dA_GH0dAEJK";
+var sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+/* ================= shapes: copied verbatim from the tracker app (index.html) ================= */
+var rowToPlayer = (r) => ({ id: Number(r.id), name: r.name, tees: r.tees || 'White', ghinNumber: r.ghin_number || '', handicapIndex: (r.handicap_index === null || r.handicap_index === undefined) ? null : Number(r.handicap_index), photoUrl: r.photo_url || '', email: r.email || '', appRole: r.app_role || 'player', stats: { rounds: r.rounds || 0, avgScore: Number(r.avg_score) || 0, lowScore: r.low_score, highScore: r.high_score, moneyWon: Number(r.money_won) || 0 } });
+var playerToRow = (p) => ({ id: p.id, name: p.name, tees: p.tees || 'White', rounds: p.stats.rounds || 0, avg_score: +(Number(p.stats.avgScore) || 0).toFixed(2), low_score: p.stats.lowScore, high_score: p.stats.highScore, money_won: +(Number(p.stats.moneyWon) || 0).toFixed(2), ghin_number: p.ghinNumber ? String(p.ghinNumber) : null, handicap_index: (p.handicapIndex === null || p.handicapIndex === undefined || p.handicapIndex === '') ? null : Number(p.handicapIndex), photo_url: p.photoUrl || null, email: p.email || null, app_role: p.appRole || 'player' });
+var gameRowToRecord = (g) => ({ date: g.played_at, teams: g.teams, scores: g.scores, settings: g.settings, groups: g.groups || [], moneyResults: g.money_results, breakdown: g.breakdown });
+var emptyStats = () => ({ rounds: 0, avgScore: 0, highScore: null, lowScore: null, moneyWon: 0 });
+
+/* Riverbend pars, from the tracker app's COURSE constant (the defaults; editable per round). */
+var COURSE = {
+  name: 'Riverbend Country Club',
+  holes: [
+    { hole: 1, par: 5, handicap: 5, white: 523 }, { hole: 2, par: 4, handicap: 13, white: 300 },
+    { hole: 3, par: 4, handicap: 7, white: 343 }, { hole: 4, par: 3, handicap: 17, white: 126 },
+    { hole: 5, par: 4, handicap: 9, white: 350 }, { hole: 6, par: 4, handicap: 3, white: 347 },
+    { hole: 7, par: 3, handicap: 15, white: 149 }, { hole: 8, par: 5, handicap: 1, white: 431 },
+    { hole: 9, par: 4, handicap: 11, white: 344 }, { hole: 10, par: 4, handicap: 8, white: 371 },
+    { hole: 11, par: 4, handicap: 12, white: 351 }, { hole: 12, par: 5, handicap: 4, white: 452 },
+    { hole: 13, par: 4, handicap: 6, white: 340 }, { hole: 14, par: 3, handicap: 16, white: 166 },
+    { hole: 15, par: 4, handicap: 18, white: 427 }, { hole: 16, par: 4, handicap: 2, white: 328 },
+    { hole: 17, par: 3, handicap: 10, white: 110 }, { hole: 18, par: 5, handicap: 14, white: 479 }
+  ]
+};
+var DEFAULT_PARS = COURSE.holes.map(function (h) { return h.par; });
+
+/* === ENGINE BEGIN ===
+   The settlement engine, copied VERBATIM from the tracker app (index.html):
+   describe, generateBetConfiguration, sanitizeConfig, sc, holeComplete,
+   getHoleWinner, settle, tally, calcMoney. The only adaptation is plumbing:
+   the app reads the component state variables teams / scores / settings /
+   COURSE directly; here createEngine(pars, teams, scores, settings) binds
+   those same names in a closure, with COURSE rebuilt from the round's
+   (editable) par row. Function bodies are character-for-character the app's.
+   The offline test harness extracts this block and runs it under node. */
+var describe = (players) => `Best ${players.map(p => p + 1).join(' & ')} ball${players.length > 1 ? 's' : ''}`;
+
+// Default split: e.g. 4 per team, 2 bets -> bet 1 = balls 1&2, bet 2 = balls 3&4
+function generateBetConfiguration(numBets, N) {
+  N = Math.max(1, N);
+  numBets = Math.max(1, Math.min(numBets, N));
+  const per = Math.max(1, Math.floor(N / numBets));
+  const config = [];
+  for (let i = 0; i < numBets; i++) {
+    const players = [];
+    for (let j = i * per; j < (i + 1) * per && j < N; j++) players.push(j);
+    config.push({ betNumber: i + 1, players, description: describe(players) });
+  }
+  return config;
+}
+
+// Keep a manual configuration valid when team sizes change
+function sanitizeConfig(config, N, numBets) {
+  const cfg = (config || []).map(b => ({ players: (b.players || []).filter(p => p < N) })).filter(b => b.players.length);
+  if (!cfg.length) return generateBetConfiguration(numBets, N);
+  return cfg.map((b, i) => ({ betNumber: i + 1, players: b.players, description: describe(b.players) }));
+}
+
+function createEngine(pars, teams, scores, settings) {
+  const COURSE = { holes: pars.map((par, i) => ({ hole: i + 1, par })) };
+  const allTeamPlayers = [...teams.team1, ...teams.team2];
+
+  const sc = (pid, i) => (scores[pid] ? scores[pid][i] : null);
+
+  // A hole counts toward the ball bets only once EVERY player on both teams has a score,
+  // so results never depend on which tee time happens to finish first.
+  const holeComplete = (i) => allTeamPlayers.length > 0 && allTeamPlayers.every(p => sc(p.id, i) !== null);
+
+  const getHoleWinner = (hole) => {
+    const i = hole - 1;
+    if (!holeComplete(i)) return null;
+    let t1 = teams.team1.map(p => sc(p.id, i)).sort((a, b) => a - b);
+    let t2 = teams.team2.map(p => sc(p.id, i)).sort((a, b) => a - b);
+    if (teams.hasOddPlayers) {
+      if (teams.teamWithExtra === 'team1' && t1.length > t2.length) t1 = t1.slice(0, -1);
+      else if (teams.teamWithExtra === 'team2' && t2.length > t1.length) t2 = t2.slice(0, -1);
+    }
+    if (!t1.length || !t2.length) return null;
+    return settings.betConfiguration.map((bc, betIndex) => {
+      const a = bc.players.filter(p => p < t1.length).map(p => t1[p]);
+      const b = bc.players.filter(p => p < t2.length).map(p => t2[p]);
+      if (!a.length || !b.length) return { betIndex, winner: 'tie' };
+      const ta = a.reduce((x, y) => x + y, 0), tb = b.reduce((x, y) => x + y, 0);
+      return { betIndex, winner: ta < tb ? 'team1' : tb < ta ? 'team2' : 'tie' };
+    });
+  };
+
+  // Settle everything through a hole. Returns bets won per category and the dollars each
+  // player on a team wins/loses (identical for everyone on the same team, whatever their tee time).
+  const settle = (throughHole = 18) => {
+    const amt = settings.betAmount;
+    const ball = settings.betConfiguration.map(b => ({ key: 'ball', label: `Bet ${b.betNumber}: ${b.description}`, t1: 0, t2: 0 }));
+    const bonus = { key: 'birdie', label: 'Birdie bonus', t1: 0, t2: 0 };
+    const par = { key: 'par', label: 'Par or better', t1: 0, t2: 0 };
+    const allb = { key: 'allballs', label: 'All balls', t1: 0, t2: 0 };
+    const side = { team1: 't1', team2: 't2' };
+    // Bet structure (Jon's rule, 2026-10-30): Nassau with automatic two-down
+    // presses, scored separately on each nine. Each ball bet starts a nine as one
+    // running bet; holes won/lost move its differential and ties change nothing.
+    // Whenever a bet newly reaches two down (either side), a press bet starts on
+    // the next hole and runs alongside it to the end of the nine. At the end of a
+    // nine, every running bet goes to whichever team is up in it; a level bet is a
+    // push. Mid-nine standings show the bets as they currently stand.
+    const openBets = settings.betConfiguration.map(() => [0]);
+    const awardOpenBets = () => { openBets.forEach((bets, bi) => { bets.forEach(d => { if (d > 0) ball[bi].t1++; else if (d < 0) ball[bi].t2++; }); }); };
+    for (let hole = 1; hole <= throughHole; hole++) {
+      const i = hole - 1, hp = COURSE.holes[i].par;
+      if (hole === 10) { awardOpenBets(); openBets.forEach((bets, bi) => { openBets[bi] = [0]; }); }
+      (getHoleWinner(hole) || []).forEach(x => {
+        const delta = x.winner === 'team1' ? 1 : x.winner === 'team2' ? -1 : 0;
+        if (delta === 0) return;
+        const bets = openBets[x.betIndex];
+        let presses = 0;
+        for (let k = 0; k < bets.length; k++) {
+          const prev = bets[k];
+          bets[k] = prev + delta;
+          if (Math.abs(bets[k]) === 2 && Math.abs(prev) < 2) presses++;
+        }
+        for (let k = 0; k < presses; k++) bets.push(0);
+      });
+      ['team1', 'team2'].forEach(t => {
+        if (settings.birdieBonus) teams[t].forEach(p => { const s = sc(p.id, i); if (s !== null) { const u = hp - s; if (u >= 1) bonus[side[t]] += Math.min(u, 3); } });
+        if (settings.parOrBetterBonus) {
+          const hs = teams[t].map(p => sc(p.id, i)).filter(s => s !== null);
+          if (hs.length === teams[t].length && hs.length > 0 && hs.reduce((a, b) => a + b, 0) <= hp * teams[t].length) par[side[t]] += teams[t].length;
+        }
+      });
+    }
+    awardOpenBets();
+    if (settings.allBalls) {
+      [settings.allBallsFront, settings.allBallsBack].forEach(h => {
+        if (!h || throughHole < h) return;
+        const a = teams.team1.map(p => sc(p.id, h - 1)).filter(s => s !== null);
+        const b = teams.team2.map(p => sc(p.id, h - 1)).filter(s => s !== null);
+        if (a.length === teams.team1.length && b.length === teams.team2.length) {
+          const ta = a.reduce((x, y) => x + y, 0), tb = b.reduce((x, y) => x + y, 0);
+          if (ta < tb) allb.t1++; else if (tb < ta) allb.t2++;
+        }
+      });
+    }
+    const rows = [...ball, ...(settings.birdieBonus ? [bonus] : []), ...(settings.parOrBetterBonus ? [par] : []), ...(settings.allBalls ? [allb] : [])]
+      .map(r => ({ ...r, net: r.t1 - r.t2 }));
+    const t1Bets = rows.reduce((a, r) => a + r.t1, 0), t2Bets = rows.reduce((a, r) => a + r.t2, 0);
+    const totalNet = t1Bets - t2Bets;
+    const n1 = teams.team1.length, n2 = teams.team2.length;
+    // The losing side pays `amt` per net bet each; the winning side splits the pot evenly among its players.
+    const f1 = totalNet > 0 && n1 ? amt * n2 / n1 : amt;
+    const f2 = totalNet < 0 && n2 ? amt * n1 / n2 : amt;
+    const r2 = (v) => Math.round(v * 100) / 100;
+    rows.forEach(r => { r.team1Amt = r2(r.net * f1); r.team2Amt = r2(-r.net * f2); });
+    const team1Amt = r2(totalNet * f1), team2Amt = r2(-totalNet * f2);
+    const moneyMap = {};
+    teams.team1.forEach(p => { moneyMap[p.id] = team1Amt; });
+    teams.team2.forEach(p => { moneyMap[p.id] = team2Amt; });
+    return { rows, t1Bets, t2Bets, totalNet, team1Amt, team2Amt, betAmount: amt, money: moneyMap };
+  };
+  const tally = (h) => { const r = settle(h); return { team1: r.t1Bets, team2: r.t2Bets }; };
+  const calcMoney = (h = 18) => settle(h).money;
+
+  return { getHoleWinner: getHoleWinner, settle: settle, tally: tally, calcMoney: calcMoney, sc: sc, holeComplete: holeComplete };
+}
+/* === ENGINE END === */
+
+/* === BUILDERS BEGIN ===
+   Pure helpers shared by the page and the offline harness.
+   v7 (2026-11-10): saving no longer writes to the database from this
+   page — buildSubmitPayload turns the entry state into the submit-round
+   endpoint's payload (the exact shape the spreadsheet clients send) and
+   the endpoint performs the finalizeGame-equivalent writes server-side.
+   buildRemovalUpdates computes the season-total reversal for the admin
+   "Remove this round" action — the one page-direct write that remains. */
+/* America/Chicago calendar date (YYYY-MM-DD) of an ISO timestamp, via Intl.
+   (Copied from functions/submit-round/index.ts.) */
+function chicagoDate(iso) {
+  var parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(iso));
+  var g = function (t) { return parts.find(function (p) { return p.type === t; }).value; };
+  return g("year") + "-" + g("month") + "-" + g("day");
+}
+function todayChicago() { return chicagoDate(new Date().toISOString()); }
+/* Score fingerprint — mirrors the submit-round endpoint's duplicate guard 2. */
+function fpOf(s) {
+  return Object.keys(s).sort().map(function (k) {
+    var v = s[k];
+    return k + ":" + (Array.isArray(v) ? v.map(function (n) { return n == null ? "" : String(n); }).join(",") : "");
+  }).join("|");
+}
+/* UI bet rows ([{a, b}] with 1-based ball numbers, b may be "" for a single-ball
+   bet) -> the app's settings shape, exactly as the spreadsheet conversion in
+   functions/submit-round/index.ts builds it. */
+function buildSettings(opts) {
+  var betConfiguration = [];
+  (opts.bets || []).forEach(function (row) {
+    var players = [];
+    var a = Number(row.a), b = Number(row.b);
+    if (a >= 1) players.push(a - 1);
+    if (row.b !== "" && row.b != null && b >= 1 && b !== a) players.push(b - 1);
+    if (!players.length) return;
+    players.sort(function (x, y) { return x - y; });
+    betConfiguration.push({ betNumber: betConfiguration.length + 1, players: players, description: describe(players) });
+  });
+  return {
+    numBets: betConfiguration.length,
+    betAmount: Number(opts.betAmount) || 0,
+    betConfiguration: betConfiguration,
+    birdieBonus: !!opts.birdieBonus,
+    parOrBetterBonus: false,
+    allBalls: !!opts.allBalls,
+    allBallsFront: Number(opts.allBallsFront) || 9,
+    allBallsBack: Number(opts.allBallsBack) || 18
+  };
+}
+/* assign: { playerId: {team: 0|1|2, group: 0..8} }. Team lists follow the
+   roster order handed in (the page keeps the roster alphabetical, matching
+   the app's E37 alphabetical display). Player objects are embedded whole,
+   exactly as the app stores them in games.teams. */
+function buildTeams(playersSorted, assign) {
+  var t1 = [], t2 = [];
+  playersSorted.forEach(function (p) {
+    var a = assign[p.id];
+    if (!a) return;
+    if (a.team === 1) t1.push(p); else if (a.team === 2) t2.push(p);
+  });
+  return {
+    team1: t1, team2: t2,
+    hasOddPlayers: t1.length !== t2.length,
+    teamWithExtra: t1.length === t2.length ? null : (t1.length > t2.length ? "team1" : "team2")
+  };
+}
+/* Groups in the app's shape: [{id, time, playerIds}] (see the app's groups
+   state and the endpoint's conversion). */
+function buildGroups(playersSorted, assign) {
+  var byNum = {};
+  playersSorted.forEach(function (p) {
+    var a = assign[p.id];
+    if (!a || !a.team || !a.group) return;
+    if (!byNum[a.group]) byNum[a.group] = [];
+    byNum[a.group].push(p.id);
+  });
+  return Object.keys(byNum).sort(function (a, b) { return Number(a) - Number(b); })
+    .map(function (n) { return { id: Number(n), time: "", playerIds: byNum[n] }; });
+}
+/* The submit-round endpoint payload for the current entry — the EXACT
+   shape the spreadsheet clients send (see submit-page/index.html), built
+   from the entry state: {date, rows, settings, source: "scorekeeper"}.
+   The endpoint is the single writer: it resolves names, builds the games
+   record in the app's shape, updates the season stats, applies each
+   row's tee to the player's record, and logs the submission for the
+   admin alert. No nameList is sent — every entry name is a roster name
+   by construction, so there is nothing to sync.
+   Row fields: name; team; group ("Group N" label, "" when none); scores
+   with nulls as 0 (= hole not played, the endpoint's contract); total =
+   the played holes' sum; birdiePts per player (for each hole under par,
+   min(under, 3) — the per-player decomposition of the engine's birdie
+   tally, the same numbers the sheet's Birdies row produces); money from
+   the engine's calcMoney; tee = the player's effective tee WORD, which
+   the endpoint writes to his record (v3.2). */
+function buildSubmitPayload(args) {
+  var moneyMap = args.engine.calcMoney(18);
+  var groupOf = {};
+  (args.groups || []).forEach(function (g) {
+    (g.playerIds || []).forEach(function (id) { groupOf[id] = "Group " + g.id; });
+  });
+  var birdiePtsOf = function (pid) {
+    if (!args.settings.birdieBonus) return 0;
+    var arr = args.scores[pid] || [];
+    var pts = 0;
+    for (var i = 0; i < 18; i++) {
+      var v = arr[i];
+      if (v !== null && v !== undefined) { var u = args.pars[i] - v; if (u >= 1) pts += Math.min(u, 3); }
+    }
+    return pts;
+  };
+  var rows = [];
+  [[1, args.teams.team1], [2, args.teams.team2]].forEach(function (tp) {
+    tp[1].forEach(function (p) {
+      var arr = (args.scores[p.id] || []).slice();
+      rows.push({
+        name: p.name, team: tp[0], group: groupOf[p.id] || "",
+        scores: arr.map(function (v) { return v === null || v === undefined ? 0 : v; }),
+        total: arr.reduce(function (a, v) { return a + (v || 0); }, 0),
+        birdiePts: birdiePtsOf(p.id),
+        money: moneyMap[p.id] || 0,
+        tee: normTee(p.tees)
+      });
+    });
+  });
+  return {
+    date: args.dateStr,
+    rows: rows,
+    settings: {
+      betAmount: args.settings.betAmount,
+      birdieBonus: !!args.settings.birdieBonus,
+      allBalls: !!args.settings.allBalls,
+      allBallsHoles: args.settings.allBalls ? [args.settings.allBallsFront, args.settings.allBallsBack] : [],
+      betConfig: (args.settings.betConfiguration || []).map(function (bc) { return bc.players.map(function (x) { return x + 1; }); }),
+      pars: args.pars.slice()
+    },
+    source: "scorekeeper"
+  };
+}
+function round2cents(v) { return Math.round((Number(v) || 0) * 100) / 100; }
+/* Admin round removal (v7): the exact reversal of a saved round's effect
+   on the season aggregates, computed from the loaded games list.
+   Money is NEVER recomputed — it is reversed from the game's own stored
+   money_results, cent-exact. Scoring stats are different: rounds and
+   avg/low/high can't be "subtracted" (an average doesn't un-mix), so
+   for a player who played all 18 holes in the removed game they are
+   REBUILT from that player's other saved games (full rounds only,
+   stored totals). Governing assumption: since the 2026-11-10 roster
+   reset, every round that counts lives in the games table, so the
+   loaded list is complete and rebuilding from it is sound — the Nov 10
+   incident's no-recompute lesson was about PRE-reset history the games
+   table didn't carry. (Money follows the stored record for the opposite
+   reason: it is exact per game, so reversal beats recomputation.)
+   A partial player (fewer than 18 stored scores) got money only when
+   the round was saved, so removal touches his money only.
+   Returns { ok: true, updated: [player, ...] } — rowToPlayer-shaped
+   clones the caller upserts via playerToRow after deleting the games
+   row — or { ok: false, error } when the reversal can't be done safely
+   from the loaded data. */
+function buildRemovalUpdates(gameRow, allGameRows, players) {
+  var target = null;
+  (allGameRows || []).forEach(function (g) { if (g === gameRow || (gameRow && g.id != null && g.id === gameRow.id)) target = g; });
+  if (!target) return { ok: false, error: "That round isn't in the loaded list of saved rounds — reload the page and try again." };
+  // Every other game's scores must be readable, or a full player's stats
+  // can't be rebuilt — refuse rather than guess.
+  var otherTotals = {};   // playerId -> [totals of their OTHER full rounds]
+  var list = allGameRows || [];
+  for (var gi = 0; gi < list.length; gi++) {
+    var g = list[gi];
+    if (g === target) continue;
+    if (!g.scores || typeof g.scores !== "object") {
+      return { ok: false, error: "A saved round (" + (g.played_at ? chicagoDate(g.played_at) : "unknown date") + ") couldn't be read, so season stats can't be rebuilt safely. Remove this round from the Supabase dashboard instead." };
+    }
+    Object.keys(g.scores).forEach(function (pid) {
+      var arr = g.scores[pid] || [];
+      var played = arr.filter(function (v) { return v !== null && v !== undefined; });
+      if (played.length === 18) {
+        if (!otherTotals[pid]) otherTotals[pid] = [];
+        otherTotals[pid].push(played.reduce(function (a, b) { return a + b; }, 0));
+      }
+    });
+  }
+  var rec = gameRowToRecord(target);
+  var moneyMap = rec.moneyResults || {};
+  var scoresMap = rec.scores || {};
+  var ids = {};
+  Object.keys(moneyMap).forEach(function (k) { ids[k] = true; });
+  Object.keys(scoresMap).forEach(function (k) { ids[k] = true; });
+  var updated = [];
+  var keys = Object.keys(ids);
+  for (var ki = 0; ki < keys.length; ki++) {
+    var pid = keys[ki];
+    var p = null;
+    (players || []).forEach(function (x) { if (String(x.id) === String(pid)) p = x; });
+    if (!p) continue;   // not on the current roster — no row to upsert
+    var stats = {
+      rounds: p.stats.rounds, avgScore: p.stats.avgScore,
+      lowScore: p.stats.lowScore, highScore: p.stats.highScore,
+      moneyWon: round2cents(p.stats.moneyWon - (Number(moneyMap[pid]) || 0))
+    };
+    var arr = scoresMap[pid] || [];
+    var playedCount = arr.filter(function (v) { return v !== null && v !== undefined; }).length;
+    if (playedCount === 18) {
+      var others = otherTotals[pid] || [];
+      var newRounds = (p.stats.rounds || 0) - 1;
+      if (newRounds !== others.length) {
+        return { ok: false, error: p.name + "'s season stats can't be rebuilt from the saved rounds (his tally doesn't match the rounds on file), so this removal was refused. Remove the round from the Supabase dashboard instead." };
+      }
+      if (!others.length) {
+        stats.rounds = 0; stats.avgScore = 0; stats.lowScore = null; stats.highScore = null;
+      } else {
+        var sum = others.reduce(function (a, b) { return a + b; }, 0);
+        stats.rounds = newRounds;
+        stats.avgScore = round2cents(sum / others.length);
+        stats.lowScore = Math.min.apply(null, others);
+        stats.highScore = Math.max.apply(null, others);
+      }
+    }
+    updated.push(Object.assign({}, p, { stats: stats }));
+  }
+  return { ok: true, updated: updated };
+}
+/* === BUILDERS END === */
+
+/* ================= app state ================= */
+var S = {
+  user: null, role: null, canEdit: false,
+  players: [],          // rowToPlayer-shaped, alphabetical
+  games: [],            // raw games rows, newest first
+  view: "enter",
+  entry: null
+};
+function freshEntry() {
+  return {
+    date: todayChicago(),
+    assign: {},                       // playerId -> {team:0|1|2, group:0..8}
+    tees: {},                         // playerId -> tee WORD override for this round ('White'|'Blue'|'Combo'|'Red'); absent = the player's stored tee
+    scores: {},                       // playerId -> [18 x (int|null)]; blank (null) holes = holes not played (left early — see partialList)
+    pars: DEFAULT_PARS.slice(),
+    betAmount: 5,
+    bets: [],                         // no fixed template: defaults are generated from the team sizes (defaultBets below) as players are assigned
+    betsTouched: false,               // set on any manual bet add/remove/edit; from then on team changes NEVER rewrite the config (E37 rule)
+    birdieBonus: true,
+    allBalls: true, allBallsFront: 5, allBallsBack: 18
+  };
+}
+S.entry = freshEntry();
+
+/* Default bets sized to the teams (Jon, 2026-11-10): "Rather than
+   defaulting to four bets, the bets should be based around how many
+   players are on each team. This way, it doesn't try to create
+   nonexistent bets by default." The default config is pairs of balls —
+   (1,2), (3,4), (5,6), … — generated while the pair's second ball is
+   <= min(team1Count, team2Count): floor(min / 2) pairs, capped at the
+   editor's 8 rows. So 10v10 → 5 pairs, 8v9 → 4, 6v6 → 3, 5v5 → 2,
+   4v4 → 2, and a team under 2 → none. Only the DEFAULTS are size-based:
+   the ball selects still offer 1–13 and a hand-set config is never
+   size-clamped (E37). */
+function defaultBets(n1, n2) {
+  var pairs = Math.min(Math.floor(Math.min(n1, n2) / 2), 8);
+  var out = [];
+  for (var i = 0; i < pairs; i++) out.push({ a: 2 * i + 1, b: 2 * i + 2 });
+  return out;
+}
+/* While the operator has NOT touched the bet editor, regenerate the
+   defaults from the entry's current team sizes (called on every team
+   assignment change). Once entry.betsTouched is set — any manual bet
+   add/remove/edit or ball-select change — this is a no-op, so team
+   changes never rewrite a hand-set config (E37). The Reset button
+   clears betsTouched and calls this, so after a reset the defaults
+   track team sizes again. Returns true when it regenerated. */
+function syncBetsToTeams(entry) {
+  if (entry.betsTouched) return false;
+  var n1 = 0, n2 = 0;
+  Object.keys(entry.assign).forEach(function (id) {
+    if (entry.assign[id].team === 1) n1++;
+    else if (entry.assign[id].team === 2) n2++;
+  });
+  entry.bets = defaultBets(n1, n2);
+  return true;
+}
+
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (ch) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]; }); }
+function money(v) { v = Number(v) || 0; return (v < 0 ? "-$" : "$") + Math.abs(v).toFixed(2); }
+function showMsg(el, kind, text) { el.className = "msg " + kind; el.textContent = text; }
+function playerById(id) { return S.players.find(function (p) { return p.id === Number(id); }); }
+
+/* Tees (v6, Jon 2026-11-10): "We also need a section in the player
+   selection that allows us to select which tees that person is playing
+   from. Default to W, but allow an adjustment to B (Blues), C (Combos)
+   R (Red)."
+   Storage format — investigated in the tracker app (index.html) and the
+   submit endpoint before coding: the players table carries `tees` as a
+   FULL WORD ('White' default; rowToPlayer/playerToRow both use it, and
+   the app's SETUP_TEE maps the captain's letters {w,b,c,r} to those same
+   words). So the UI shows single letters (W/B/C/R, matching the sheet)
+   while every value this page stores or writes is the word. normTee
+   accepts either form (or any casing) and returns the word. */
+function normTee(v) {
+  var words = { w: "White", b: "Blue", c: "Combo", r: "Red", white: "White", blue: "Blue", combo: "Combo", red: "Red" };
+  return words[String(v == null ? "" : v).trim().toLowerCase()] || "White";
+}
+function teeLetter(v) {
+  var letters = { White: "W", Blue: "B", Combo: "C", Red: "R" };
+  return letters[normTee(v)];
+}
+/* The tee a player is playing from in THIS entry: the operator's
+   per-round override when one is set, else the player's stored tee,
+   else White. */
+function teeOfPlayer(p) {
+  var ov = (S.entry.tees || {})[p.id];
+  return normTee(ov != null && ov !== "" ? ov : p.tees);
+}
+/* The roster with this entry's tee overrides folded in — the mirror of
+   the tracker app's setup flow, where applySetupImport folds the
+   sheet's tee letters into roster state ({...p, tees}) and the game is
+   then built from that roster. currentSetup builds teams/groups from
+   these objects, so the payload built from them carries the tees each
+   man actually played that day; the endpoint embeds those tees in the
+   saved games record's teams and writes them back to the player rows
+   (v3.2) — exactly how a tee changed in the app's setup reaches the
+   database. Players with no override pass through untouched. */
+function effectivePlayers() {
+  var ov = S.entry.tees || {};
+  return S.players.map(function (p) {
+    return ov[p.id] != null ? Object.assign({}, p, { tees: normTee(ov[p.id]) }) : p;
+  });
+}
+
+/* Build the engine inputs from the entry state (assigned players only). */
+function currentSetup() {
+  var e = S.entry;
+  var eff = effectivePlayers();
+  var teams = buildTeams(eff, e.assign);
+  var settings = buildSettings({ bets: e.bets, betAmount: e.betAmount, birdieBonus: e.birdieBonus, allBalls: e.allBalls, allBallsFront: e.allBallsFront, allBallsBack: e.allBallsBack });
+  var groups = buildGroups(eff, e.assign);
+  var scores = {};
+  teams.team1.concat(teams.team2).forEach(function (p) {
+    scores[p.id] = (e.scores[p.id] || Array(18).fill(null)).slice();
+  });
+  return { teams: teams, settings: settings, groups: groups, scores: scores };
+}
+function currentEngine() {
+  var s = currentSetup();
+  return { setup: s, engine: createEngine(S.entry.pars, s.teams, s.scores, s.settings) };
+}
+function assignedPlayers() {
+  var s = currentSetup();
+  return s.teams.team1.concat(s.teams.team2);
+}
+/* Left-early rule (Jon, 2026-11-10): "If the player leaves after nine
+   holes, they are still responsible for any amount owed for the full
+   round." So a partial player is charged the engine's FULL team amount
+   like everyone else (no proration — calcMoney does this automatically),
+   their unplayed holes stay blank and simply don't exist for settling
+   (the engine's own treatment of missing holes, verbatim from the app),
+   and they get money only — no rounds/avg/low/high (the submit
+   endpoint's per-player update mirrors the app on this).
+   v5 (Jon, 2026-11-10): there is NO "Left early" marking anymore. Partial
+   status is DERIVED from the scores alone: a player with at least one
+   entered score and at least one blank hole left early. The played holes
+   must be one unbroken run (blanks are only meaningful as "didn't play
+   those holes"), a player with NO scores at all is a missing card — not
+   a left-early — and the save confirm asks the operator to verify the
+   blanks before anything is written. */
+function playedCount(pid) {
+  var sc = S.entry.scores[pid] || [];
+  var n = 0;
+  sc.forEach(function (v) { if (v !== null) n++; });
+  return n;
+}
+function contiguousRun(pid) {
+  var sc = S.entry.scores[pid] || [];
+  var first = -1, last = -1, n = 0;
+  sc.forEach(function (v, i) { if (v !== null) { if (first < 0) first = i; last = i; n++; } });
+  return n > 0 && last - first + 1 === n;
+}
+function partialList() {
+  return assignedPlayers().filter(function (p) { var n = playedCount(p.id); return n > 0 && n < 18; });
+}
+function allScoresIn() {
+  var ps = assignedPlayers();
+  if (!ps.length) return false;
+  return ps.every(function (p) {
+    var n = playedCount(p.id);
+    if (n === 18) return true;
+    return n >= 1 && contiguousRun(p.id);   // a partial card (left early) counts as in — blanks alone say so
+  });
+}
+
+/* ================= auth =================
+   v7 (Jon, 2026-11-10): "set it up so anyone can enter the scores
+   whether or not they are logged in." Signed OUT, the app is fully open
+   for entry — Enter Scores, Upload Spreadsheet, Setup Card, Season
+   Tally — with the roster and tally read from the
+   guest_round_snapshot() RPC (the same public, read-only snapshot the
+   submit page uses; its players carry id/name/tees/stats, which is
+   everything entry needs, tee defaults included). Past Rounds and Add
+   Player stay signed-in-only: Past Rounds is where admins remove
+   rounds, and Add Player writes the roster. Saves from either state
+   POST to the submit-round endpoint — see the save flow. A signed-in
+   VIEWER remains read-only for saving (viewer is a deliberate account
+   role; the no-account path is signing out), but like everyone else
+   they can view the Setup Card (Jon, 2026-11-10: non-admins get the
+   round setup card too). */
+function setAdminTabs() {
+  var signedIn = !!S.user;
+  $("tabSetup").style.display = "";
+  $("tabPast").style.display = signedIn ? "" : "none";
+  if (!signedIn && S.view === "past") switchView("enter");
+}
+function applySession(session) {
+  if (session && session.user) {
+    S.user = session.user;
+    $("adminCard").style.display = "none";
+    $("whoBar").style.display = "";
+    $("whoEmail").textContent = S.user.email || "";
+    setAdminTabs();
+    loadAll();
+  } else {
+    S.user = null; S.role = null; S.canEdit = false;
+    $("whoBar").style.display = "none";
+    $("adminCard").style.display = "";
+    $("roNote").innerHTML = "";
+    setAdminTabs();
+    loadAnon();
+  }
+}
+/* Signed-out data: roster + tally from the guest snapshot RPC. There is
+   no games list signed out (Past Rounds is hidden), so the local
+   duplicate pre-checks in validateSave simply have nothing to check —
+   the endpoint's guards are the authority, as they are for every
+   spreadsheet submission. */
+async function loadAnon() {
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/guest_round_snapshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY },
+      body: "{}"
+    });
+    if (!r.ok) throw new Error("roster snapshot failed (" + r.status + ")");
+    var d = await r.json();
+    S.players = (d.players || []).map(rowToPlayer).sort(function (a, b) { return a.name.localeCompare(b.name); });
+    S.games = [];
+    renderAll();
+  } catch (e) {
+    showMsg($("saveMsg"), "err", "Could not load the roster: " + (e.message || e));
+  }
+}
+async function loadAll() {
+  try {
+    var pr = await sb.from("profiles").select("role, player_id").eq("user_id", S.user.id).single();
+    S.role = (pr.data && pr.data.role) || "viewer";
+    S.canEdit = ["admin", "scorekeeper"].indexOf(S.role) >= 0;
+    $("whoRole").textContent = "Role: " + S.role;
+    $("roNote").innerHTML = S.canEdit ? "" :
+      "<p class='warn'>You're signed in as a <strong>viewer</strong> — you can look at everything, but only admins and scorekeepers can save a round.</p>";
+    var pl = await sb.from("players").select("*");
+    if (pl.error) throw pl.error;
+    S.players = (pl.data || []).map(rowToPlayer).sort(function (a, b) { return a.name.localeCompare(b.name); });
+    var ga = await sb.from("games").select("*").order("played_at", { ascending: false });
+    if (ga.error) throw ga.error;
+    S.games = ga.data || [];
+    renderAll();
+  } catch (e) {
+    showMsg($("saveMsg"), "err", "Could not load data: " + (e.message || e));
+  }
+}
+$("btnLogin").addEventListener("click", async function () {
+  var email = $("liEmail").value.trim(), pass = $("liPass").value;
+  if (!email || !pass) { showMsg($("loginMsg"), "err", "Enter your email and password."); return; }
+  $("btnLogin").disabled = true;
+  var r = await sb.auth.signInWithPassword({ email: email, password: pass });
+  $("btnLogin").disabled = false;
+  if (r.error) showMsg($("loginMsg"), "err", "Sign-in failed: " + r.error.message);
+});
+$("liPass").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnLogin").click(); });
+$("btnLogout").addEventListener("click", async function () { await sb.auth.signOut(); });
+
+/* ================= tabs ================= */
+function switchView(v) {
+  S.view = v;
+  $("viewEnter").style.display = v === "enter" ? "" : "none";
+  $("viewUpload").style.display = v === "upload" ? "" : "none";
+  $("viewSetup").style.display = v === "setup" ? "" : "none";
+  $("viewTally").style.display = v === "tally" ? "" : "none";
+  $("viewPast").style.display = v === "past" ? "" : "none";
+  $("tabEnter").className = v === "enter" ? "on" : "";
+  $("tabUpload").className = v === "upload" ? "on" : "";
+  $("tabSetup").className = v === "setup" ? "on" : "";
+  $("tabTally").className = v === "tally" ? "on" : "";
+  $("tabPast").className = v === "past" ? "on" : "";
+  if (v === "setup") renderSetupCard();
+  if (v === "tally") renderTally();
+  if (v === "past") renderPast();
+}
+$("tabEnter").addEventListener("click", function () { switchView("enter"); });
+$("tabUpload").addEventListener("click", function () { switchView("upload"); });
+$("tabSetup").addEventListener("click", function () { switchView("setup"); });
+$("tabTally").addEventListener("click", function () { switchView("tally"); });
+$("tabPast").addEventListener("click", function () { switchView("past"); });
+
+/* ================= enter view rendering ================= */
+function renderAll() {
+  $("inDate").value = S.entry.date;
+  $("inBetAmt").value = S.entry.betAmount;
+  $("inBirdie").checked = S.entry.birdieBonus;
+  $("inAllBalls").checked = S.entry.allBalls;
+  $("inAbF").value = S.entry.allBallsFront;
+  $("inAbB").value = S.entry.allBallsBack;
+  renderRoster(); renderBets(); renderGrids(); updateDerived(); renderTally(); renderPast();
+  applyReadOnly();
+}
+function applyReadOnly() {
+  $("addPlayerBox").style.display = S.canEdit ? "" : "none";
+  var controls = document.querySelectorAll("#viewEnter input, #viewEnter select, #viewEnter button");
+  if (S.user && !S.canEdit) {
+    // A signed-in VIEWER is deliberately read-only (viewer is an account
+    // role; the no-account path is signing out, not the viewer role).
+    Array.prototype.forEach.call(controls, function (el) { el.disabled = true; });
+    return;
+  }
+  // Editors, and signed-out visitors — open entry is the v7 point, so
+  // controls are live. Re-enabling also undoes a viewer pass after a
+  // sign-out without a page reload.
+  Array.prototype.forEach.call(controls, function (el) { el.disabled = false; });
+  $("btnAddBet").disabled = S.entry.bets.length >= 8;
+}
+function renderRoster() {
+  var e = S.entry;
+  var html = "";
+  S.players.forEach(function (p) {
+    var a = e.assign[p.id] || { team: 0, group: 0 };
+    var chip = a.team === 1 ? "<button class='chip t1' data-cycle='" + p.id + "'>Team 1</button>"
+      : a.team === 2 ? "<button class='chip t2' data-cycle='" + p.id + "'>Team 2</button>"
+      : "<button class='chip' data-cycle='" + p.id + "'>—</button>";
+    var gsel = "";
+    var tsel = "";
+    if (a.team) {
+      var opts = "<option value='0'>No group</option>";
+      for (var g = 1; g <= 8; g++) opts += "<option value='" + g + "'" + (a.group === g ? " selected" : "") + ">Group " + g + "</option>";
+      gsel = "<span class='gsel'><select data-group='" + p.id + "'>" + opts + "</select></span>";
+      // Tee selector (v6): appears on assignment, beside the group
+      // select. The operator sees single letters (W/B/C/R, the sheet's
+      // notation); the stored value is the tee WORD, the players-table
+      // format. Pre-selected from the player's effective tee.
+      var curTee = teeOfPlayer(p);
+      var topts = "";
+      ["White", "Blue", "Combo", "Red"].forEach(function (w) {
+        topts += "<option value='" + w + "'" + (curTee === w ? " selected" : "") + ">" + teeLetter(w) + "</option>";
+      });
+      tsel = "<span class='tsel'><select data-tee='" + p.id + "' title='Tees'>" + topts + "</select></span>";
+    }
+    html += "<div class='prow'><button class='pname' data-cycle='" + p.id + "'>" + esc(p.name) + "</button>" + chip + tsel + gsel + "</div>";
+  });
+  $("roster").innerHTML = html;
+  var n1 = 0, n2 = 0;
+  Object.keys(e.assign).forEach(function (id) { if (e.assign[id].team === 1) n1++; else if (e.assign[id].team === 2) n2++; });
+  $("teamCounts").textContent = "Team 1: " + n1 + " · Team 2: " + n2 + (n1 && n2 && n1 !== n2 ? " · (uneven — the extra team's worst ball is dropped per hole, as in the app)" : "");
+}
+function cycleTeam(pid) {
+  if (S.user && !S.canEdit) return;   // signed-in viewers only; signed-out entry is open (v7)
+  var e = S.entry;
+  var a = e.assign[pid] || { team: 0, group: 0 };
+  a.team = (a.team + 1) % 3;
+  if (a.team && !e.scores[pid]) e.scores[pid] = Array(18).fill(null);
+  e.assign[pid] = a;
+  syncBetsToTeams(e);   // bet editor untouched: the defaults follow the new team sizes
+  renderRoster(); renderBets(); renderGrids(); updateDerived(); applyReadOnly();
+}
+$("roster").addEventListener("click", function (ev) {
+  var b = ev.target.closest("[data-cycle]");
+  if (b) cycleTeam(Number(b.getAttribute("data-cycle")));
+});
+$("roster").addEventListener("change", function (ev) {
+  var s = ev.target.closest("[data-group]");
+  if (s) { var a = S.entry.assign[Number(s.getAttribute("data-group"))]; if (a) a.group = Number(s.value); }
+  var t = ev.target.closest("[data-tee]");
+  if (t) {
+    // Tee change for this round: recorded as an override on the entry.
+    // It reaches the database only through the save's full-roster upsert
+    // (and the saved record's embedded teams) — see effectivePlayers.
+    S.entry.tees[Number(t.getAttribute("data-tee"))] = t.value;
+    if (S.view === "setup") renderSetupCard();
+  }
+});
+$("inDate").addEventListener("change", function () { S.entry.date = this.value || todayChicago(); });
+
+/* Add a player (v2): admin/scorekeeper only. Inserts the same row shape the
+   submit endpoint creates for a new player, then reloads the roster so the
+   new name is ready to assign. Duplicate names (any casing) are refused. */
+$("btnAddPlayer").addEventListener("click", async function () {
+  var msg = $("npMsg");
+  if (!S.canEdit) { showMsg(msg, "err", "Only admins and scorekeepers can add players."); return; }
+  var name = $("npName").value.replace(/\s+/g, " ").trim();
+  if (!name) { showMsg(msg, "err", "Type the new player's name first."); return; }
+  var dup = S.players.some(function (p) { return p.name.toLowerCase() === name.toLowerCase(); });
+  if (dup) { showMsg(msg, "err", name + " is already on the roster."); return; }
+  var btn = this;
+  btn.disabled = true; btn.textContent = "Adding…";
+  var row = { id: Date.now(), name: name, tees: $("npTees").value || "White", rounds: 0, avg_score: 0, low_score: null, high_score: null, money_won: 0 };
+  var ins = await sb.from("players").insert(row);
+  if (ins.error) {
+    btn.disabled = false; btn.textContent = "Add player";
+    showMsg(msg, "err", "Could not add " + name + " — the database refused it (" + ins.error.message + "). Check your connection and that you're signed in as an admin or scorekeeper.");
+    return;
+  }
+  var pl = await sb.from("players").select("*");
+  if (!pl.error) S.players = (pl.data || []).map(rowToPlayer).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  btn.disabled = false; btn.textContent = "Add player";
+  $("npName").value = "";
+  renderRoster(); renderGrids(); updateDerived(); applyReadOnly();
+  showMsg(msg, "ok", "Added " + name + " — tap their name in the list above to put them on a team.");
+});
+
+/* Setup card (v2): the day's setup in the spreadsheet Players tab's terms —
+   date, bet amount, birdie bonus, All Balls holes, the bets in sheet
+   notation (1-2, 3-4), both team columns with each player's group, and the
+   group lists. Big, high-contrast, no controls: made to be photographed. */
+function renderSetupCard() {
+  var e = S.entry, s = currentSetup();
+  var box = $("setupCard");
+  if (!s.teams.team1.length && !s.teams.team2.length) {
+    box.innerHTML = "<div class='card'><p class='note' style='margin:0'>No players assigned yet — set up the round under Enter Scores and this card fills in.</p></div>";
+    return;
+  }
+  var d = new Date(e.date + "T12:00:00");
+  var dstr = isNaN(d.getTime()) ? e.date : d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  var betsTxt = e.bets.filter(function (b) { return Number(b.a) >= 1; })
+    .map(function (b) { return (b.b === "" || b.b == null) ? String(b.a) : b.a + "-" + b.b; }).join("  ·  ");
+  var grpOf = function (p) { var a = e.assign[p.id]; return a && a.group ? a.group : 0; };
+  var teamCol = function (title, plist, cls) {
+    var h = "<div><h3 class='" + cls + "'>" + title + " (" + plist.length + ")</h3><ul>";
+    plist.forEach(function (p) {
+      var g = grpOf(p);
+      // Tee pill (v6) beside the group pill: plist comes from
+      // currentSetup, so p.tees is the tee in force for THIS round
+      // (entry override folded in), shown as the sheet's single letter.
+      h += "<li><span>" + esc(p.name) + "</span><span class='pills'><span class='t'>" + teeLetter(p.tees) + "</span>" + (g ? "<span class='g'>Group " + g + "</span>" : "") + "</span></li>";
+    });
+    return h + "</ul></div>";
+  };
+  var h = "<div class='card setupcard'>" +
+    "<div class='sc-date'>⛳ " + esc(dstr) + "</div>" +
+    "<div class='sc-meta'><strong>" + money(e.betAmount) + "</strong> per bet · Birdie bonus <strong>" + (e.birdieBonus ? "ON" : "OFF") + "</strong> · All Balls <strong>" +
+      (e.allBalls ? "holes " + e.allBallsFront + " &amp; " + e.allBallsBack : "OFF") + "</strong></div>" +
+    "<div class='sc-meta'>Bets: <strong>" + esc(betsTxt || "—") + "</strong></div>" +
+    "<div class='sc-cols'>" + teamCol("Team 1", s.teams.team1, "") + teamCol("Team 2", s.teams.team2, "t2h") + "</div>";
+  if (s.groups.length) {
+    h += "<div class='sc-groups'>";
+    s.groups.forEach(function (g) {
+      var names = g.playerIds.map(function (id) { var p = playerById(id); return p ? p.name : ""; }).filter(Boolean);
+      h += "<div><b>Group " + g.id + ":</b> " + esc(names.join(", ")) + "</div>";
+    });
+    h += "</div>";
+  }
+  box.innerHTML = h + "</div>";
+}
+
+function ballOptions(sel, allowNone) {
+  var h = allowNone ? "<option value=''>none</option>" : "";
+  for (var i = 1; i <= 13; i++) h += "<option value='" + i + "'" + (sel === i ? " selected" : "") + ">" + i + "</option>";
+  return h;
+}
+function renderBets() {
+  var html = "";
+  S.entry.bets.forEach(function (b, i) {
+    html += "<div class='betrow'><span class='bl'>Bet " + (i + 1) + "</span>" +
+      "<select data-bet='" + i + "' data-part='a'>" + ballOptions(b.a, false) + "</select>" +
+      "<select data-bet='" + i + "' data-part='b'>" + ballOptions(b.b === "" ? "" : Number(b.b), true) + "</select>" +
+      (S.entry.bets.length > 1 ? "<button class='del' data-delbet='" + i + "' title='Remove bet'>✕</button>" : "<span style='flex:0 0 44px'></span>") + "</div>";
+  });
+  $("betRows").innerHTML = html;
+  $("btnAddBet").disabled = S.entry.bets.length >= 8;
+}
+$("betRows").addEventListener("change", function (ev) {
+  var s = ev.target.closest("[data-bet]");
+  if (!s) return;
+  S.entry.betsTouched = true;   // hand-set from here on: team changes never rewrite the config (E37)
+  var row = S.entry.bets[Number(s.getAttribute("data-bet"))];
+  if (s.getAttribute("data-part") === "a") row.a = Number(s.value); else row.b = s.value === "" ? "" : Number(s.value);
+  updateDerived();
+});
+$("betRows").addEventListener("click", function (ev) {
+  var d = ev.target.closest("[data-delbet]");
+  if (d) { S.entry.betsTouched = true; S.entry.bets.splice(Number(d.getAttribute("data-delbet")), 1); renderBets(); updateDerived(); applyReadOnly(); }
+});
+$("btnAddBet").addEventListener("click", function () {
+  if (S.entry.bets.length >= 8) return;
+  S.entry.betsTouched = true;
+  var last = S.entry.bets[S.entry.bets.length - 1];
+  var start = last ? (Number(last.b === "" ? last.a : last.b) + 1) : 1;
+  S.entry.bets.push({ a: Math.min(start, 13), b: Math.min(start + 1, 13) });
+  renderBets(); updateDerived(); applyReadOnly();
+});
+/* Reset: regenerate the size-based defaults from the CURRENT teams and
+   return to the untouched state, so later team changes regenerate the
+   defaults again (a reset is "start following the teams again", not a
+   one-time snapshot). */
+$("btnResetBets").addEventListener("click", function () {
+  S.entry.betsTouched = false;
+  syncBetsToTeams(S.entry);
+  renderBets(); updateDerived(); applyReadOnly();
+});
+$("inBetAmt").addEventListener("change", function () { S.entry.betAmount = Number(this.value) || 0; updateDerived(); });
+$("inBirdie").addEventListener("change", function () { S.entry.birdieBonus = this.checked; updateDerived(); });
+$("inAllBalls").addEventListener("change", function () { S.entry.allBalls = this.checked; $("abHoles").style.opacity = this.checked ? "1" : ".4"; updateDerived(); });
+$("inAbF").addEventListener("change", function () { S.entry.allBallsFront = Number(this.value) || 5; updateDerived(); });
+$("inAbB").addEventListener("change", function () { S.entry.allBallsBack = Number(this.value) || 18; updateDerived(); });
+
+function gridTable(teamNo, plist) {
+  var e = S.entry;
+  var title = teamNo === 1 ? "Team 1" : "Team 2";
+  var h = "<h3>" + title + "</h3><div class='scroll'><table class='grid'><tr><th>Player</th>";
+  for (var i = 1; i <= 9; i++) h += "<th>" + i + "</th>";
+  h += "<th>Out</th>";
+  for (var j = 10; j <= 18; j++) h += "<th>" + j + "</th>";
+  h += "<th>In</th><th>Tot</th></tr>";
+  if (teamNo === 1) {
+    h += "<tr><td>Par</td>";
+    e.pars.forEach(function (par, i) {
+      h += "<td><input class='par' data-par='" + i + "' inputmode='numeric' value='" + par + "'></td>";
+      if (i === 8) h += "<td class='tot' id='parOut'></td>";
+    });
+    h += "<td class='tot' id='parIn'></td><td class='tot' id='parTot'></td></tr>";
+  }
+  plist.forEach(function (p) {
+    var a = S.entry.assign[p.id] || { group: 0 };
+    var sc = S.entry.scores[p.id] || Array(18).fill(null);
+    h += "<tr><td>" + esc(p.name) + (a.group ? " <span style='color:#778;font-weight:400'>· G" + a.group + "</span>" : "") + "</td>";
+    sc.forEach(function (v, i) {
+      h += "<td><input data-pid='" + p.id + "' data-hole='" + i + "' inputmode='numeric' value='" + (v === null ? "" : v) + "'></td>";
+      if (i === 8) h += "<td class='tot' id='c-out-" + p.id + "'></td>";
+    });
+    h += "<td class='tot' id='c-in-" + p.id + "'></td><td class='tot' id='c-tot-" + p.id + "'></td></tr>";
+  });
+  h += "<tr class='ttot'><td>Team total</td>";
+  for (var k = 0; k < 9; k++) h += "<td></td>";
+  h += "<td id='tt-out-" + teamNo + "'></td>";
+  for (var m = 0; m < 9; m++) h += "<td></td>";
+  h += "<td id='tt-in-" + teamNo + "'></td><td id='tt-tot-" + teamNo + "'></td></tr></table></div>";
+  return h;
+}
+function renderGrids() {
+  var s = currentSetup();
+  if (!s.teams.team1.length && !s.teams.team2.length) {
+    $("grids").innerHTML = "<p class='note'>Assign players to teams in Setup and their score rows appear here.</p>";
+    return;
+  }
+  $("grids").innerHTML = gridTable(1, s.teams.team1) + gridTable(2, s.teams.team2);
+}
+$("grids").addEventListener("change", function (ev) {
+  var t = ev.target;
+  if (t.hasAttribute("data-par")) {
+    var v = parseInt(t.value, 10);
+    S.entry.pars[Number(t.getAttribute("data-par"))] = (isNaN(v) || v < 1 || v > 6) ? S.entry.pars[Number(t.getAttribute("data-par"))] : v;
+    t.value = S.entry.pars[Number(t.getAttribute("data-par"))];
+    updateDerived(); return;
+  }
+  if (t.hasAttribute("data-pid")) {
+    var pid = Number(t.getAttribute("data-pid")), hole = Number(t.getAttribute("data-hole"));
+    if (!S.entry.scores[pid]) S.entry.scores[pid] = Array(18).fill(null);
+    if (t.value === "") S.entry.scores[pid][hole] = null;
+    else { var n = parseInt(t.value, 10); S.entry.scores[pid][hole] = (isNaN(n) || n < 1) ? null : Math.min(n, 20); t.value = S.entry.scores[pid][hole] === null ? "" : S.entry.scores[pid][hole]; }
+    updateDerived();
+  }
+});
+
+/* Recompute row/team totals + results without touching the inputs. */
+function updateDerived() {
+  var e = S.entry, s = currentSetup();
+  var parOut = e.pars.slice(0, 9).reduce(function (a, b) { return a + b; }, 0);
+  var parIn = e.pars.slice(9).reduce(function (a, b) { return a + b; }, 0);
+  if ($("parOut")) { $("parOut").textContent = parOut; $("parIn").textContent = parIn; $("parTot").textContent = parOut + parIn; }
+  [1, 2].forEach(function (tn) {
+    var plist = tn === 1 ? s.teams.team1 : s.teams.team2;
+    var tOut = 0, tIn = 0, any = false;
+    plist.forEach(function (p) {
+      var sc = s.scores[p.id] || [];
+      var o = sc.slice(0, 9).reduce(function (a, v) { return a + (v || 0); }, 0);
+      var ii = sc.slice(9).reduce(function (a, v) { return a + (v || 0); }, 0);
+      var has = sc.some(function (v) { return v !== null; });
+      if (has) { any = true; tOut += o; tIn += ii; }
+      var co = $("c-out-" + p.id); if (co) { co.textContent = has ? o : ""; $("c-in-" + p.id).textContent = has ? ii : ""; $("c-tot-" + p.id).textContent = has ? (o + ii) : ""; }
+    });
+    var to = $("tt-out-" + tn);
+    if (to) { to.textContent = any ? tOut : ""; $("tt-in-" + tn).textContent = any ? tIn : ""; $("tt-tot-" + tn).textContent = any ? (tOut + tIn) : ""; }
+  });
+  renderResults();
+  applyHighlights();
+  if (S.view === "setup") renderSetupCard();
+}
+
+/* Scorecard highlights (v2), entry grid: ring the birdies (double ring for
+   eagles) against the CURRENT par row, and tint the All Balls hole columns
+   from the CURRENT settings. Runs after every totals update, so it tracks
+   edits without re-rendering the grid (input focus is never disturbed). */
+function applyHighlights() {
+  var e = S.entry;
+  var ab = {};
+  if (e.allBalls) { ab[e.allBallsFront] = true; ab[e.allBallsBack] = true; }
+  Array.prototype.forEach.call(document.querySelectorAll("#grids input[data-pid]"), function (inp) {
+    var hole = Number(inp.getAttribute("data-hole"));
+    var arr = S.entry.scores[Number(inp.getAttribute("data-pid"))];
+    var s = arr ? arr[hole] : null;
+    var par = e.pars[hole];
+    inp.classList.toggle("eag", s !== null && s !== undefined && par - s >= 2);
+    inp.classList.toggle("bird", s !== null && s !== undefined && par - s === 1);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#grids table.grid"), function (tbl) {
+    if (!tbl.rows.length) return;
+    var colHole = [];
+    Array.prototype.forEach.call(tbl.rows[0].cells, function (c, idx) {
+      var t = c.textContent.trim();
+      var n = parseInt(t, 10);
+      colHole[idx] = (!isNaN(n) && String(n) === t && n >= 1 && n <= 18) ? n : 0;
+    });
+    Array.prototype.forEach.call(tbl.rows, function (row, ri) {
+      Array.prototype.forEach.call(row.cells, function (c, idx) {
+        var on = !!ab[colHole[idx] || 0];
+        c.classList.toggle("abcol", on);
+        if (ri === 0) c.classList.toggle("abh", on);
+      });
+    });
+  });
+}
+function renderResults() {
+  var box = $("results");
+  var built = currentEngine(), s = built.setup;
+  var n1 = s.teams.team1.length, n2 = s.teams.team2.length;
+  if (n1 < 2 || n2 < 2) { box.innerHTML = "<p class='note'>Assign at least 2 players to each team.</p>"; return; }
+  if (!allScoresIn()) {
+    var ps = assignedPlayers();
+    var done = ps.filter(function (p) { return playedCount(p.id) === 18; }).length;
+    var missing = ps.filter(function (p) { return playedCount(p.id) === 0; });
+    var gapped = ps.filter(function (p) { var n = playedCount(p.id); return n > 0 && n < 18 && !contiguousRun(p.id); });
+    var note = "Results appear once every assigned player has all 18 scores — or a partial card (blank holes = left early) (" + done + " of " + ps.length + " players complete).";
+    if (missing.length) {
+      note += " No scores entered yet for " + missing.map(function (p) { return esc(p.name); }).join(", ") + ".";
+    }
+    if (gapped.length) {
+      note += " " + gapped.map(function (p) { return esc(p.name); }).join(", ") +
+        " ha" + (gapped.length === 1 ? "s" : "ve") + " a gap in the middle of the card — blank holes only count as holes not played, so fill the gap or clear the holes after it.";
+    }
+    box.innerHTML = "<p class='note'>" + note + "</p>";
+    return;
+  }
+  var r = built.engine.settle(18);
+  var h = "<table><tr><th>Bet</th><th>Team 1</th><th>Team 2</th><th>$/player T1</th><th>$/player T2</th></tr>";
+  r.rows.forEach(function (row) {
+    h += "<tr><td>" + esc(row.label) + "</td><td>" + row.t1 + "</td><td>" + row.t2 + "</td><td class='" + (row.team1Amt < 0 ? "neg" : "") + "'>" + money(row.team1Amt) + "</td><td class='" + (row.team2Amt < 0 ? "neg" : "") + "'>" + money(row.team2Amt) + "</td></tr>";
+  });
+  h += "<tr style='font-weight:700'><td>Total bets</td><td>" + r.t1Bets + "</td><td>" + r.t2Bets + "</td><td class='" + (r.team1Amt < 0 ? "neg" : "") + "'>" + money(r.team1Amt) + "</td><td class='" + (r.team2Amt < 0 ? "neg" : "") + "'>" + money(r.team2Amt) + "</td></tr></table>";
+  if (r.totalNet > 0) h += "<p class='team' style='font-weight:700'>Team 1 wins " + r.t1Bets + "–" + r.t2Bets + " — Team 2 pays " + money(-r.team2Amt) + " per player.</p>";
+  else if (r.totalNet < 0) h += "<p class='team' style='font-weight:700'>Team 2 wins " + r.t2Bets + "–" + r.t1Bets + " — Team 1 pays " + money(-r.team1Amt) + " per player.</p>";
+  else h += "<p class='team' style='font-weight:700'>All square " + r.t1Bets + "–" + r.t2Bets + " — no money changes hands.</p>";
+  var parts = partialList();
+  if (parts.length) {
+    h += "<p class='warn'>⏱️ <strong>Left early:</strong> " +
+      parts.map(function (p) { return esc(p.name) + " (" + playedCount(p.id) + " holes)"; }).join(", ") +
+      " — the FULL team amount above counts for them; no scoring stats are recorded for a partial round.</p>";
+  }
+  box.innerHTML = h;
+}
+
+/* ================= save flow =================
+   v7: EVERY save — signed in or not — POSTs the entry to the
+   submit-round endpoint (publishable-key headers, the same open
+   submission path the spreadsheet clients and the Upload tab use), and
+   the endpoint performs the writes. The server is the authority: its
+   messages are shown verbatim, and its duplicate guards (date +
+   score-fingerprint) back the local pre-checks below, which run only
+   where a games list exists (signed in) as a courtesy. */
+function validateSave() {
+  if (S.user && !S.canEdit) return "You're signed in as a viewer — viewers can't save rounds. Sign out to submit without an account, or sign in as an admin or scorekeeper.";
+  var e = S.entry, built = currentEngine(), s = built.setup;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.date)) return "Pick a valid round date.";
+  if (s.teams.team1.length < 2 || s.teams.team2.length < 2) return "Each team needs at least 2 players.";
+  if (!s.settings.betConfiguration.length) return "Set at least one bet.";
+  var bad = [], empty = [], broken = [];
+  s.teams.team1.concat(s.teams.team2).forEach(function (p) {
+    var sc = s.scores[p.id] || [];
+    for (var i = 0; i < 18; i++) {
+      var v = sc[i];
+      if (v !== null && (!Number.isInteger(v) || v < 1 || v > 15)) { bad.push(p.name + " (hole " + (i + 1) + ")"); break; }
+    }
+    var n = playedCount(p.id);
+    if (n === 0) empty.push(p.name);
+    else if (n < 18 && !contiguousRun(p.id)) broken.push(p.name);
+  });
+  if (bad.length) return "Every entered score must be a whole number from 1 to 15. Check: " + bad.join(", ") + ".";
+  if (empty.length) return "No scores entered for: " + empty.join(", ") + ". That's a missing card, not a left-early — enter their scores, or take them off the teams in Setup.";
+  if (broken.length) return "These players have a gap in the middle of their scores: " + broken.join(", ") + ". Blank holes are read as holes they didn't play (left early), so the holes they did play must be one unbroken run — fill the gap, or clear the holes after it.";
+  for (var gi = 0; gi < S.games.length; gi++) {
+    if (chicagoDate(S.games[gi].played_at) === e.date) {
+      return "A round is already saved for " + e.date + " — one round per day. If it was saved by mistake, an admin can remove it under Past Rounds.";
+    }
+  }
+  var fp = fpOf(s.scores);
+  for (var fi = 0; fi < S.games.length; fi++) {
+    if (S.games[fi].scores && fpOf(S.games[fi].scores) === fp) {
+      return "This exact round (same players, same scores) is already saved — it looks like a duplicate submission.";
+    }
+  }
+  return null;
+}
+var pendingPayload = null;
+$("btnSave").addEventListener("click", function () {
+  var err = validateSave();
+  if (err) { showMsg($("saveMsg"), "err", err); return; }
+  $("saveMsg").className = "msg";
+  var built = currentEngine(), s = built.setup;
+  pendingPayload = buildSubmitPayload({ dateStr: S.entry.date, teams: s.teams, scores: s.scores, settings: s.settings, groups: s.groups, engine: built.engine, pars: S.entry.pars });
+  var r = built.engine.settle(18);
+  var parts = partialList();
+  var h = "";
+  if (parts.length) {
+    // Blanks are read as left-early (Jon, v5) — so the confirm LEADS with
+    // the ask: are these blanks correct? Confirming saves them as partial
+    // rounds (nulls on the unplayed holes, full team money, no stats);
+    // cancelling returns to entry with nothing written.
+    h += "<p class='warn'>⏱️ <strong>Some scores are blank — is that correct?</strong> These players will be recorded as <strong>LEFT EARLY</strong> (full money counts, no scoring stats):<br>" +
+      parts.map(function (p) { return esc(p.name) + " — " + playedCount(p.id) + " holes played"; }).join("<br>") + "</p>";
+  }
+  h += "<p><strong>Date:</strong> " + esc(S.entry.date) + "<br>" +
+    "<strong>Teams:</strong> Team 1 (" + s.teams.team1.length + ") vs Team 2 (" + s.teams.team2.length + ")<br>" +
+    "<strong>Result:</strong> " + r.t1Bets + "–" + r.t2Bets + " in bets<br>" +
+    "<strong>Money:</strong> Team 1 " + money(r.team1Amt) + " per player · Team 2 " + money(r.team2Amt) + " per player</p>";
+  h += "<p class='note'>Saving writes this round to the shared database and updates the season tally — the same record the tracker app and the spreadsheet submit create.</p>";
+  $("confirmBody").innerHTML = h;
+  $("confirmMsg").className = "msg";
+  $("confirmModal").className = "modal on";
+});
+$("btnCancelSave").addEventListener("click", function () { $("confirmModal").className = "modal"; pendingPayload = null; });
+$("btnConfirmSave").addEventListener("click", async function () {
+  if (!pendingPayload) return;
+  var btn = this;
+  btn.disabled = true; btn.textContent = "Saving…";
+  var out;
+  try {
+    var resp = await fetch(SUPABASE_URL + "/functions/v1/submit-round", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY },
+      body: JSON.stringify(pendingPayload)
+    });
+    var j = null;
+    try { j = await resp.json(); } catch (e2) { /* non-JSON error body */ }
+    out = { status: resp.status, j: j };
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Yes — save round";
+    showMsg($("confirmMsg"), "err", "Save failed — nothing was counted. Network error: " + (e.message || e));
+    return;
+  }
+  btn.disabled = false; btn.textContent = "Yes — save round";
+  if (out.status !== 200) {
+    // The server's refusal (duplicate date, duplicate round, validation)
+    // is shown verbatim — it is the authority, and nothing was written.
+    showMsg($("confirmMsg"), "err", "Not submitted (" + out.status + "): " + ((out.j && out.j.error) || "the server didn't say why."));
+    return;
+  }
+  $("confirmModal").className = "modal";
+  pendingPayload = null;
+  var serverMsg = (out.j && out.j.message) || "Round submitted.";
+  S.entry = freshEntry();
+  if (S.user) await loadAll(); else await loadAnon();
+  switchView("tally");
+  showMsg($("saveOk"), "ok", serverMsg);
+  window.scrollTo(0, 0);
+});
+
+/* ================= season tally ================= */
+function renderTally() {
+  var ps = S.players.slice().sort(function (a, b) { return b.stats.moneyWon - a.stats.moneyWon; });
+  var h = "<table><tr><th>#</th><th>Player</th><th>Rds</th><th>Avg</th><th>Best</th><th>Worst</th><th>Money</th></tr>";
+  ps.forEach(function (p, i) {
+    h += "<tr><td>" + (i + 1) + "</td><td>" + esc(p.name) + "</td><td>" + p.stats.rounds + "</td><td>" +
+      (p.stats.rounds ? Number(p.stats.avgScore).toFixed(1) : "—") + "</td><td>" + (p.stats.lowScore == null ? "—" : p.stats.lowScore) +
+      "</td><td>" + (p.stats.highScore == null ? "—" : p.stats.highScore) + "</td><td class='" + (p.stats.moneyWon < 0 ? "neg" : "") + "'>" +
+      money(p.stats.moneyWon) + "</td></tr>";
+  });
+  $("tally").innerHTML = h + "</table>";
+}
+
+/* ================= past rounds ================= */
+function gameAmounts(rec) {
+  var t1 = rec.breakdown && typeof rec.breakdown.team1Amt === "number" ? rec.breakdown.team1Amt : null;
+  var t2 = rec.breakdown && typeof rec.breakdown.team2Amt === "number" ? rec.breakdown.team2Amt : null;
+  if (t1 === null && rec.teams.team1.length && rec.moneyResults) t1 = rec.moneyResults[rec.teams.team1[0].id];
+  if (t2 === null && rec.teams.team2.length && rec.moneyResults) t2 = rec.moneyResults[rec.teams.team2[0].id];
+  return { t1: t1 == null ? 0 : t1, t2: t2 == null ? 0 : t2 };
+}
+function pastCard(rec, teamNo, pars) {
+  var plist = teamNo === 1 ? rec.teams.team1 : rec.teams.team2;
+  // Highlights (v2): ring birdies/eagles against THIS game's pars, and tint
+  // the All Balls columns from THIS game's stored settings.
+  var st = rec.settings || {};
+  var ab = {};
+  if (st.allBalls) { if (st.allBallsFront) ab[st.allBallsFront] = true; if (st.allBallsBack) ab[st.allBallsBack] = true; }
+  var abTd = function (hole) { return ab[hole] ? " class='abcol'" : ""; };
+  var cellVal = function (v, hole) {
+    if (v == null) return "–";
+    var under = pars[hole - 1] - v;
+    if (under >= 2) return "<span class='circ eag'>" + v + "</span>";
+    if (under === 1) return "<span class='circ'>" + v + "</span>";
+    return String(v);
+  };
+  var h = "<h3>Team " + teamNo + "</h3><div class='scroll'><table class='grid'><tr><th>Player</th>";
+  for (var i = 1; i <= 9; i++) h += "<th" + (ab[i] ? " class='abh abcol'" : "") + ">" + i + "</th>";
+  h += "<th>Out</th>";
+  for (var j = 10; j <= 18; j++) h += "<th" + (ab[j] ? " class='abh abcol'" : "") + ">" + j + "</th>";
+  h += "<th>In</th><th>Tot</th><th>$</th></tr><tr><td>Par</td>";
+  pars.forEach(function (par, i) { h += "<td" + abTd(i + 1) + ">" + par + "</td>"; if (i === 8) h += "<td class='tot'>" + pars.slice(0, 9).reduce(function (a, b) { return a + b; }, 0) + "</td>"; });
+  h += "<td class='tot'>" + pars.slice(9).reduce(function (a, b) { return a + b; }, 0) + "</td><td class='tot'>" + pars.reduce(function (a, b) { return a + b; }, 0) + "</td><td></td></tr>";
+  plist.forEach(function (p) {
+    var sc = (rec.scores && rec.scores[p.id]) || [];
+    var o = sc.slice(0, 9).reduce(function (a, v) { return a + (v || 0); }, 0);
+    var ii = sc.slice(9).reduce(function (a, v) { return a + (v || 0); }, 0);
+    // Tee letter (v6) from the RECORD's own embedded player object —
+    // every record producer (app finalize, submit endpoint, this page)
+    // snapshots the full player object, tees included, into games.teams,
+    // so this is the tee he played THAT day, not his current roster tee.
+    h += "<tr><td>" + esc(p.name) + " <span style='color:#778;font-weight:400'>· " + teeLetter(p.tees) + "</span></td>";
+    sc.forEach(function (v, i) { h += "<td" + abTd(i + 1) + ">" + cellVal(v, i + 1) + "</td>"; if (i === 8) h += "<td class='tot'>" + o + "</td>"; });
+    var mv = rec.moneyResults ? rec.moneyResults[p.id] : null;
+    h += "<td class='tot'>" + ii + "</td><td class='tot'>" + (o + ii) + "</td><td class='" + (mv < 0 ? "neg" : "") + "'>" + (mv == null ? "—" : money(mv)) + "</td></tr>";
+  });
+  return h + "</table></div>";
+}
+function renderPast() {
+  if (!S.games.length) { $("pastList").innerHTML = "<p class='note'>No saved rounds yet.</p>"; return; }
+  var h = "";
+  S.games.forEach(function (g, idx) {
+    var rec = gameRowToRecord(g);
+    var amts = gameAmounts(rec);
+    var d = chicagoDate(g.played_at);
+    var pars = rec.breakdown && Array.isArray(rec.breakdown.pars) && rec.breakdown.pars.length === 18 ? rec.breakdown.pars : DEFAULT_PARS;
+    h += "<div class='pastitem' data-past='" + idx + "'><div class='ph'><span>" + esc(d) + "</span><span>" +
+      rec.teams.team1.length + " v " + rec.teams.team2.length + "</span></div>" +
+      "<div class='ph' style='font-weight:400'><span>Team 1 " + money(amts.t1) + "/player</span><span>Team 2 " + money(amts.t2) + "/player</span></div>" +
+      "<div class='pastbody' id='past-" + idx + "' style='display:none'>" + pastCard(rec, 1, pars) + pastCard(rec, 2, pars) +
+      // Admin removal (v7): Jon's safety net for open submission — anyone
+      // can submit, an admin can back a bad round out. Editors only; the
+      // reversal math lives in buildRemovalUpdates (BUILDERS block).
+      (S.canEdit ? "<button class='secondary small' data-remove='" + idx + "' style='margin-top:12px'>Remove this round</button>" : "") +
+      "</div></div>";
+  });
+  $("pastList").innerHTML = h;
+}
+$("pastList").addEventListener("click", function (ev) {
+  var rb = ev.target.closest("[data-remove]");
+  if (rb) { openRemoveModal(Number(rb.getAttribute("data-remove"))); return; }
+  var item = ev.target.closest("[data-past]");
+  if (!item) return;
+  var body = $("past-" + item.getAttribute("data-past"));
+  if (body) body.style.display = body.style.display === "none" ? "" : "none";
+});
+
+/* ================= admin round removal (v7) =================
+   The safety net for open submission: anyone can submit a round, and an
+   admin or scorekeeper can remove it here. The games row is deleted and
+   each player's season aggregates are reversed by buildRemovalUpdates
+   (money from the round's own stored money_results; full-round stats
+   rebuilt from the player's remaining saved rounds) — page-direct
+   writes under the editor's RLS rights, like the old save path was.
+   The submission_log row is deliberately NOT deleted: it's the audit
+   trail of what was submitted (and what the admin was alerted about). */
+var pendingRemove = null;
+function openRemoveModal(idx) {
+  var g = S.games[idx];
+  if (!g || !S.canEdit) return;
+  var rec = gameRowToRecord(g);
+  var amts = gameAmounts(rec);
+  var n = rec.teams.team1.length + rec.teams.team2.length;
+  var d = chicagoDate(g.played_at);
+  $("removeBody").innerHTML =
+    "<p><strong>Date:</strong> " + esc(d) + "<br>" +
+    "<strong>Teams:</strong> Team 1 (" + rec.teams.team1.length + ") vs Team 2 (" + rec.teams.team2.length + ")<br>" +
+    "<strong>Result:</strong> Team 1 " + money(amts.t1) + " per player · Team 2 " + money(amts.t2) + " per player<br>" +
+    "<strong>Players:</strong> " + n + "</p>" +
+    "<p class='warn'>Removing this round <strong>backs it out of the season totals</strong>: every player's money is reduced by exactly what this round paid them, and their scoring stats (rounds, average, best/worst) are rebuilt from their remaining rounds. This can't be undone from here.</p>";
+  $("removeMsg").className = "msg";
+  pendingRemove = idx;
+  $("removeModal").className = "modal on";
+}
+$("btnCancelRemove").addEventListener("click", function () { $("removeModal").className = "modal"; pendingRemove = null; });
+$("btnConfirmRemove").addEventListener("click", async function () {
+  if (pendingRemove === null) return;
+  var g = S.games[pendingRemove];
+  if (!g) { $("removeModal").className = "modal"; pendingRemove = null; return; }
+  var res = buildRemovalUpdates(g, S.games, S.players);
+  if (!res.ok) { showMsg($("removeMsg"), "err", res.error); return; }
+  var btn = this;
+  btn.disabled = true; btn.textContent = "Removing…";
+  try {
+    var del = await sb.from("games").delete().eq("id", g.id);
+    if (del.error) throw new Error(del.error.message);
+    if (res.updated.length) {
+      var up = await sb.from("players").upsert(res.updated.map(playerToRow));
+      if (up.error) throw new Error("the round was deleted, but updating the season totals failed (" + up.error.message + ") — check the tally in the Supabase dashboard before doing anything else.");
+    }
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Yes — remove round";
+    showMsg($("removeMsg"), "err", "Removal failed: " + (e.message || e));
+    return;
+  }
+  btn.disabled = false; btn.textContent = "Yes — remove round";
+  $("removeModal").className = "modal";
+  pendingRemove = null;
+  var d = chicagoDate(g.played_at);
+  await loadAll();
+  switchView("past");
+  showMsg($("saveOk"), "ok", "Round for " + d + " removed — season totals backed out.");
+  window.scrollTo(0, 0);
+});
+
+/* ================= upload spreadsheet (v3) =================
+   The standalone submit page's flow, ported into this app so the upload
+   is discoverable without leaving the scorekeeper: pick the day's
+   workbook and it is parsed HERE, in the browser, with SheetJS — the
+   file itself is never uploaded; only the JSON payload is POSTed to the
+   submit-round endpoint (publishable-key headers, the same open
+   submission path the standalone page uses). The parsing functions below
+   (cell, num, fmtDate, buildPayload, readNameList, nameListCheck) are
+   the submit page's own, with ONE deliberate deviation: the par row on
+   the Team 1 card is found by its "Par" label instead of assuming a
+   fixed row — the delivered calculator puts it at row 20, the captain's
+   older layout at row 24, and a fixed row silently read zeros from his
+   file. The offline harness extracts these functions and runs them
+   against both real workbooks. */
+var upPayload = null;
+var upOffenders = [];
+
+function cell(ws, ref) { var c = ws[ref]; return c ? c.v : undefined; }
+function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+function fmtDate(v) {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === "number") { var d = XLSX.SSF.parse_date_code(v); if (d) return d.y + "-" + String(d.m).padStart(2, "0") + "-" + String(d.d).padStart(2, "0"); }
+  var s = String(v || "").slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+function buildPayload(wb) {
+  var ex = wb.Sheets["Round Export"], pl = wb.Sheets["Players"], t1 = wb.Sheets["Team 1"];
+  if (!ex || !pl || !t1) throw new Error("This file is missing the Round Export, Players, or Team 1 sheet — is it the Riverbend calculator file?");
+  var rows = [], i, r, c;
+  // Read rows 2..45: the delivered calculator fills rows 2..27, the
+  // captain's older layout runs Team 2 down to row 30. Empty slots are
+  // skipped — including slots whose name cell reads back as the number 0
+  // (an empty linked cell in the older layout).
+  for (r = 2; r <= 45; r++) {
+    var name = cell(ex, "B" + r);
+    if (name === undefined || typeof name === "number" || String(name).trim() === "") continue;
+    var scores = [];
+    for (c = 0; c < 18; c++) scores.push(num(cell(ex, XLSX.utils.encode_col(4 + c) + r)));
+    rows.push({
+      name: String(name).trim(),
+      team: String(cell(ex, "C" + r) || "").indexOf("1") >= 0 ? 1 : 2,
+      group: String(cell(ex, "D" + r) || ""),
+      scores: scores,
+      total: num(cell(ex, "Y" + r)), birdiePts: num(cell(ex, "AA" + r)), money: num(cell(ex, "AB" + r))
+    });
+  }
+  if (!rows.length) throw new Error("Round Export has no players — enter and save the scores first.");
+  var bets = [];
+  for (r = 11; r <= 20; r++) {
+    var a = cell(pl, "H" + r), b = cell(pl, "I" + r);
+    if (a !== undefined && a !== "") bets.push(b !== undefined && b !== "" ? [num(a), num(b)] : [num(a)]);
+  }
+  var ab = [];
+  ["J11", "J12"].forEach(function (ref) { var v = cell(pl, ref); if (v !== undefined && v !== "") ab.push(num(v)); });
+  // Par row: located by its "Par" label in column A of the Team 1 card
+  // (row 20 in the delivered calculator, row 24 in the captain's older
+  // layout); falls back to row 20 when no label is found.
+  var parRow = 20;
+  for (r = 1; r <= 40; r++) {
+    var av = cell(t1, "A" + r);
+    if (av !== undefined && String(av).trim().toLowerCase() === "par") { parRow = r; break; }
+  }
+  var pars = [];
+  for (c = 1; c <= 9; c++) pars.push(num(cell(t1, XLSX.utils.encode_col(c) + parRow)));
+  for (c = 12; c <= 20; c++) pars.push(num(cell(t1, XLSX.utils.encode_col(c) + parRow)));
+  var date = fmtDate(cell(ex, "A2")) || fmtDate(cell(pl, "L13"));
+  if (!date) throw new Error("No round date found in the file (Players L13 / Round Export).");
+  var yn = function (v) { return String(v || "").trim().toLowerCase() === "yes"; };
+  var out = { date: date, rows: rows, settings: {
+    betAmount: num(cell(pl, "L10")), birdieBonus: yn(cell(pl, "L11")), allBalls: yn(cell(pl, "L12")),
+    allBallsHoles: ab, betConfig: bets, pars: pars }, source: "spreadsheet" };
+  // Roster sync (Jon, 2026-11-10): the workbook's Name List rides along
+  // so the server can add any listed name that's missing from the web
+  // app's roster. Left off entirely when the tab is absent (the server
+  // then skips the sync).
+  var nlNames = readNameList(wb);
+  if (nlNames) out.nameList = nlNames;
+  return out;
+}
+
+// Name List tab, column A (A2:A201): trimmed, whitespace-collapsed,
+// blanks skipped. Returns null when the sheet doesn't exist.
+function readNameList(wb) {
+  var nl = wb.Sheets["Name List"];
+  if (!nl) return null;
+  var names = [], r, v;
+  for (r = 2; r <= 201; r++) {
+    v = cell(nl, "A" + r);
+    if (v !== undefined && String(v).trim() !== "") names.push(String(v).trim().replace(/\s+/g, " "));
+  }
+  return names;
+}
+
+// Name List rule (Jon, 2026-11-10): every submitted player must be on the
+// workbook's OWN Name List tab (column A, A2:A201), matched exactly after
+// trim + case folding. Returns the list of offending names (empty = OK).
+function nameListCheck(wb, rows) {
+  var nl = wb.Sheets["Name List"];
+  if (!nl) throw new Error("This file has no Name List tab — the players cannot be verified against it.");
+  var allowed = {}, r, v;
+  for (r = 2; r <= 201; r++) {
+    v = cell(nl, "A" + r);
+    if (v !== undefined && String(v).trim() !== "") allowed[String(v).trim().toLowerCase()] = true;
+  }
+  return rows.filter(function (x) { return !allowed[x.name.toLowerCase()]; })
+             .map(function (x) { return x.name; });
+}
+
+// Holes actually played in a row (0 = hole not played on the sheet).
+function holesPlayed(r) { return r.scores.filter(function (s) { return s > 0; }).length; }
+
+/* History highlight (Jon, 2026-11-10): "If any player is added to the app
+   and has a score history, but is not in a spreadsheet upload, that player
+   should be highlighted." A player WITH history in the app who is missing
+   from the uploaded file is flagged in the preview — a non-blocking amber
+   warning; he stays in the app either way (submissions never remove
+   players — the roster sync in the endpoint is add-only). "History" means
+   rounds > 0 OR money != 0, so a partial-only player (money moved without
+   a counted round) counts. Presence is checked against every name the
+   file carries: its Name List names PLUS the game's row names. */
+// Levenshtein distance <= 1 (the same check the submit endpoint uses).
+function levLE1(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  var i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; }
+    else {
+      edits++; if (edits > 1) return false;
+      if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+    }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+function normNameParts(s) {
+  return String(s || "").replace(/\s+/g, " ").trim().toLowerCase().split(" ").filter(function (t) { return t !== ""; });
+}
+/* players: [{name, rounds, money}] (app side). fileNames: every name the
+   uploaded file carries. Returns the history players NOT present in the
+   file. Matching is trim/case-folded, with a unique-surname fallback: if
+   exactly one file name shares the player's surname and the first names
+   are within edit distance 1, he's the same man spelled differently and
+   counts as present ("Brian Young" in the file covers app "Bryan Young");
+   two file names with that surname is ambiguous and does not cover him. */
+function missingHistoryPlayers(players, fileNames) {
+  var fileNorm = {}, fileList = [];
+  (fileNames || []).forEach(function (n) {
+    var parts = normNameParts(n);
+    if (!parts.length) return;
+    var key = parts.join(" ");
+    if (!fileNorm[key]) { fileNorm[key] = true; fileList.push(parts); }
+  });
+  return (players || []).filter(function (p) {
+    if (!(Number(p.rounds) > 0 || Number(p.money) !== 0)) return false;
+    var parts = normNameParts(p.name);
+    if (!parts.length) return false;
+    if (fileNorm[parts.join(" ")]) return false;
+    var last = parts[parts.length - 1];
+    var sameSurname = fileList.filter(function (fp) { return fp[fp.length - 1] === last; });
+    if (sameSurname.length === 1 && levLE1(sameSurname[0][0], parts[0])) return false;
+    return true;
+  });
+}
+function historyWarningHtml(missing) {
+  if (!missing.length) return "";
+  var items = missing.map(function (p) {
+    var m = Number(p.money) || 0;
+    var mstr = (m > 0 ? "+$" : m < 0 ? "-$" : "$") + Math.abs(m).toFixed(2);
+    var r = Number(p.rounds) || 0;
+    return esc(p.name) + " — " + r + (r === 1 ? " round" : " rounds") + ", " + mstr;
+  });
+  return "<p class='warn'>⚠️ <strong>In the app with scoring history, but NOT in this spreadsheet:</strong><br>" +
+    items.join("<br>") +
+    "<br>They stay in the app — submissions never remove players. If one of them played in this round, check the spreadsheet's Name List and score rows.</p>";
+}
+
+function showUploadPreview(p) {
+  var sum = p.rows.reduce(function (a, r) { return a + r.money; }, 0);
+  var partials = p.rows.filter(function (r) { var n = holesPlayed(r); return n > 0 && n < 18; });
+  var html = "";
+  if (upOffenders.length) {
+    html += "<p class='blockerr'>⛔ <strong>Cannot submit — these players are not on the Name List tab:</strong> " +
+      upOffenders.map(esc).join(", ") + ". Add them to the Name List first (or fix the name), save, and pick the file again.</p>";
+  }
+  // History highlight: app players with scoring history who are absent
+  // from this file (checked against its Name List + game rows). Uses this
+  // app's loaded roster (S.players); non-blocking — submit stays enabled.
+  var fileNames = (p.nameList || []).concat(p.rows.map(function (r) { return r.name; }));
+  html += historyWarningHtml(missingHistoryPlayers(S.players.map(function (pl) {
+    return { name: pl.name, rounds: pl.stats.rounds, money: pl.stats.moneyWon };
+  }), fileNames));
+  html += "<p class='team'>Date: " + esc(p.date) + "</p>";
+  [1, 2].forEach(function (t) {
+    html += "<p class='team'>Team " + t + "</p><table><tr><th>Player</th><th>Total</th><th>Money</th></tr>";
+    p.rows.filter(function (r) { return r.team === t; }).forEach(function (r) {
+      var n = holesPlayed(r);
+      var badge = n > 0 && n < 18 ? "<span class='badge'>" + n + " holes</span>" : "";
+      html += "<tr><td>" + esc(r.name) + badge + "</td><td>" + r.total + "</td><td class='" + (r.money < 0 ? "neg" : "") + "'>" + money(r.money) + "</td></tr>";
+    });
+    html += "</table>";
+  });
+  if (partials.length) {
+    html += "<p class='warn'>⏱️ <strong>Partial rounds:</strong> " +
+      partials.map(function (r) { return esc(r.name) + " (" + holesPlayed(r) + " holes)"; }).join(", ") +
+      " — they'll be recorded for money only, with no scoring stats, the same way the app treats a player who didn't finish the round.</p>";
+  }
+  if (Math.abs(sum) > 0.10) html += "<p class='warn'>⚠️ Money doesn't balance: the per-player amounts add to " + money(sum) + " instead of $0. The server will reject this — check the Results sheet before submitting.</p>";
+  $("upPreview").innerHTML = html;
+}
+
+$("upFile").addEventListener("change", function (e) {
+  var f = e.target.files && e.target.files[0];
+  var btn = $("upSubmit"), res = $("upResult");
+  res.className = "msg"; res.textContent = "";
+  btn.disabled = true; btn.textContent = "Submit round";
+  upPayload = null; upOffenders = [];
+  $("upPreview").innerHTML = "";
+  if (!f) return;
+  if (typeof XLSX === "undefined") {
+    showMsg(res, "err", "The spreadsheet reader didn't load — check your connection and refresh the page.");
+    return;
+  }
+  f.arrayBuffer().then(function (buf) {
+    var wb = XLSX.read(buf, { type: "array", cellDates: true });
+    upPayload = buildPayload(wb);
+    upOffenders = nameListCheck(wb, upPayload.rows);
+    showUploadPreview(upPayload);
+    btn.disabled = upOffenders.length > 0;
+  }).catch(function (err) {
+    showMsg(res, "err", "Could not read that file: " + err.message);
+  });
+});
+
+$("upSubmit").addEventListener("click", function () {
+  if (!upPayload) return;
+  var btn = this, res = $("upResult");
+  if (upOffenders.length) {
+    showMsg(res, "err", "Not submitted — these players are not on the Name List tab: " + upOffenders.join(", ") + ". Add them to the Name List first.");
+    return;
+  }
+  btn.disabled = true; btn.textContent = "Submitting…";
+  fetch(SUPABASE_URL + "/functions/v1/submit-round", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY },
+    body: JSON.stringify(upPayload)
+  })
+    .then(function (r) { return r.json().then(function (j) { return { status: r.status, j: j }; }); })
+    .then(function (out) {
+      if (out.status === 200) {
+        btn.textContent = "Submitted ✓";
+        return (S.user ? loadAll() : loadAnon()).then(function () {
+          showMsg(res, "ok", (out.j.message || "Round submitted.") +
+            (S.user
+              ? "\n\nThis app's Season Tally and Past Rounds have been refreshed with the new round — check Past Rounds to see it here."
+              : "\n\nThe Season Tally has been refreshed with the new round."));
+        });
+      }
+      showMsg(res, "err", "Not submitted (" + out.status + "): " + (out.j.error || JSON.stringify(out.j)));
+      btn.disabled = false; btn.textContent = "Submit round";
+    })
+    .catch(function (err) {
+      showMsg(res, "err", "Network error: " + err.message);
+      btn.disabled = false; btn.textContent = "Submit round";
+    });
+});
+
+/* ================= init ================= */
+if (!sb) {
+  $("adminCard").style.display = "";
+  showMsg($("loginMsg"), "err", "The sign-in library didn't load — check your connection and refresh.");
+} else {
+  sb.auth.getSession().then(function (r) { applySession(r.data.session); });
+  sb.auth.onAuthStateChange(function (_evt, session) { applySession(session); });
+}
+})();
+</script>
+</body>
+</html>
