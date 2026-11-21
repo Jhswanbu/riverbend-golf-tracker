@@ -104,6 +104,15 @@
   @media (max-width: 560px) { .setupcard .sc-cols { grid-template-columns: 1fr; } }
   .pastitem { border: 1px solid #d8e2d8; border-radius: 12px; padding: 12px; margin: 10px 0; background: #fff; cursor: pointer; }
   .pastitem .ph { display: flex; justify-content: space-between; font-weight: 700; }
+  /* bet-by-bet audit (v7.5): the workbook's Audit tab, online */
+  .auditwrap { margin-top: 14px; border: 1px solid #d8e2d8; border-radius: 12px; padding: 10px 12px; background: #fbfdfb; }
+  .auditwrap summary { font-weight: 700; cursor: pointer; color: #14532d; padding: 4px 0; }
+  .auditwrap h4 { margin: 14px 0 6px; font-size: .98rem; }
+  table.audittable { font-size: 13px; min-width: 620px; }
+  table.audittable th, table.audittable td { text-align: center; padding: 3px 6px; }
+  table.audittable td:first-child { font-weight: 600; }
+  table.audittable tr.void td { color: #9aa79c; }
+  table.audittable tr.audittotal td { font-weight: 700; background: #eef5ee; text-align: right; }
   .modal { position: fixed; inset: 0; background: rgba(10,25,12,.55); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
   .modal.on { display: flex; }
   .modal .box { background: #fff; border-radius: 14px; padding: 18px; max-width: 520px; width: 100%; max-height: 86vh; overflow-y: auto; }
@@ -187,7 +196,7 @@
         <button id="btnResetBets" class="secondary small" style="width:100%;min-height:44px;margin-top:4px">Reset bets to team-size defaults</button>
         <p class="note">Until you change a bet yourself, the defaults follow the team sizes — pairs of balls (1-2, 3-4, …) the smaller team can actually cover, so the app never invents a bet that doesn't exist. Once you edit the bets, team changes leave them alone.</p>
         <label class="tog"><input type="checkbox" id="inBirdie"> Birdie bonus</label>
-        <label class="tog"><input type="checkbox" id="inPar"> Par or better</label>
+        <label class="tog"><input type="checkbox" id="inPar"> Team Par or Better</label>
         <label class="tog"><input type="checkbox" id="inAllBalls"> All Balls</label>
         <div class="grid2" id="abHoles">
           <div><label class="f" for="inAbF">All Balls — front hole (1-9)</label><input type="number" id="inAbF" inputmode="numeric" min="1" max="9"></div>
@@ -300,13 +309,18 @@ var COURSE = {
 var DEFAULT_PARS = COURSE.holes.map(function (h) { return h.par; });
 
 /* === ENGINE BEGIN ===
-   The settlement engine, copied VERBATIM from the tracker app (index.html):
-   describe, generateBetConfiguration, sanitizeConfig, sc, holeComplete,
-   getHoleWinner, settle, tally, calcMoney. The only adaptation is plumbing:
-   the app reads the component state variables teams / scores / settings /
-   COURSE directly; here createEngine(pars, teams, scores, settings) binds
-   those same names in a closure, with COURSE rebuilt from the round's
-   (editable) par row. Function bodies are character-for-character the app's.
+   The settlement engine, originally copied from the tracker app
+   (index.html): describe, generateBetConfiguration, sanitizeConfig, sc,
+   holeComplete, getHoleWinner, settle, tally, calcMoney — plus
+   auditTrail (scorekeeper only). Plumbing: the app reads the component
+   state variables teams / scores / settings / COURSE directly; here
+   createEngine(pars, teams, scores, settings) binds those same names
+   in a closure, with COURSE rebuilt from the round's (editable) par
+   row. DIVERGED from the app 2026-11-20 at Jon's direction, to match
+   the workbook: Team Par or Better is the aggregate all-balls rule,
+   ball bets field from the scores present (a blank voids only the
+   Par or Better bet, and only for the team with the blank), and
+   auditTrail replays the press walk for the Audit view.
    The offline test harness extracts this block and runs it under node. */
 var describe = (players) => `Best ${players.map(p => p + 1).join(' & ')} ball${players.length > 1 ? 's' : ''}`;
 
@@ -337,24 +351,30 @@ function createEngine(pars, teams, scores, settings) {
 
   const sc = (pid, i) => (scores[pid] ? scores[pid][i] : null);
 
-  // A hole counts toward the ball bets only once EVERY player on both teams has a score,
-  // so results never depend on which tee time happens to finish first.
+  // holeComplete marks a fully-entered hole; getHoleWinner uses it for
+  // the odd-player trim. (Team Par or Better checks each team's own
+  // completeness separately, inside settle.)
   const holeComplete = (i) => allTeamPlayers.length > 0 && allTeamPlayers.every(p => sc(p.id, i) !== null);
 
+  // Ball bets follow the workbook (Jon's call, 2026-11-20): a bet scores
+  // on a hole whenever both teams can field that bet's balls from the
+  // scores present — a blank score drops out instead of voiding the
+  // hole. A bet a team cannot field (too few scores in) is void on that
+  // hole and reported as a tie, so it moves no press. On a complete
+  // hole this is exactly the old behavior, odd-player trim included.
   const getHoleWinner = (hole) => {
     const i = hole - 1;
-    if (!holeComplete(i)) return null;
-    let t1 = teams.team1.map(p => sc(p.id, i)).sort((a, b) => a - b);
-    let t2 = teams.team2.map(p => sc(p.id, i)).sort((a, b) => a - b);
-    if (teams.hasOddPlayers) {
+    let t1 = teams.team1.map(p => sc(p.id, i)).filter(s => s !== null).sort((a, b) => a - b);
+    let t2 = teams.team2.map(p => sc(p.id, i)).filter(s => s !== null).sort((a, b) => a - b);
+    if (!t1.length || !t2.length) return null;
+    if (holeComplete(i) && teams.hasOddPlayers) {
       if (teams.teamWithExtra === 'team1' && t1.length > t2.length) t1 = t1.slice(0, -1);
       else if (teams.teamWithExtra === 'team2' && t2.length > t1.length) t2 = t2.slice(0, -1);
     }
-    if (!t1.length || !t2.length) return null;
     return settings.betConfiguration.map((bc, betIndex) => {
       const a = bc.players.filter(p => p < t1.length).map(p => t1[p]);
       const b = bc.players.filter(p => p < t2.length).map(p => t2[p]);
-      if (!a.length || !b.length) return { betIndex, winner: 'tie' };
+      if (a.length < bc.players.length || b.length < bc.players.length) return { betIndex, winner: 'tie' };
       const ta = a.reduce((x, y) => x + y, 0), tb = b.reduce((x, y) => x + y, 0);
       return { betIndex, winner: ta < tb ? 'team1' : tb < ta ? 'team2' : 'tie' };
     });
@@ -366,7 +386,7 @@ function createEngine(pars, teams, scores, settings) {
     const amt = settings.betAmount;
     const ball = settings.betConfiguration.map(b => ({ key: 'ball', label: `Bet ${b.betNumber}: ${b.description}`, t1: 0, t2: 0 }));
     const bonus = { key: 'birdie', label: 'Birdie bonus', t1: 0, t2: 0 };
-    const par = { key: 'par', label: 'Par or better', t1: 0, t2: 0 };
+    const par = { key: 'par', label: 'Team Par or Better', t1: 0, t2: 0 };
     const allb = { key: 'allballs', label: 'All balls', t1: 0, t2: 0 };
     const side = { team1: 't1', team2: 't2' };
     // Bet structure (Jon's rule, 2026-10-30): Nassau with automatic two-down
@@ -395,21 +415,18 @@ function createEngine(pars, teams, scores, settings) {
       });
       ['team1', 'team2'].forEach(t => {
         if (settings.birdieBonus) teams[t].forEach(p => { const s = sc(p.id, i); if (s !== null) { const u = hp - s; if (u >= 1) bonus[side[t]] += Math.min(u, 3); } });
-        if (settings.parOrBetterBonus && holeComplete(i)) {
-          // Jon's rule (2026-11-12, matching the workbook's Team Bonus): ONE
-          // extra bet for the team when EVERY configured bet finishes the
-          // hole at or under par for its ball count. Ball lists mirror
-          // getHoleWinner (sorted scores, odd-player trim); a bet that can't
-          // field all its balls kills the bonus for that team on that hole.
-          const other = t === 'team1' ? 'team2' : 'team1';
-          let sorted = teams[t].map(p => sc(p.id, i)).sort((a, b) => a - b);
-          if (teams.hasOddPlayers && teams.teamWithExtra === t && sorted.length > teams[other].length) sorted = sorted.slice(0, -1);
-          const ok = settings.betConfiguration.length > 0 && settings.betConfiguration.every(bc => {
-            const balls = bc.players.filter(p => p < sorted.length).map(p => sorted[p]);
-            if (balls.length < bc.players.length) return false;
-            return balls.reduce((x, y) => x + y, 0) <= hp * balls.length;
-          });
-          if (ok) par[side[t]] += 1;
+        if (settings.parOrBetterBonus) {
+          // Jon's rule (2026-11-19, matching the workbook's Team Par or
+          // Better): ONE extra bet for the team when the sum of ALL its
+          // players' scores on the hole is at or under par times the
+          // number of players on the team. Every ball counts, not just
+          // the balls carrying bets. This is the ONLY award a blank
+          // score can void (Jon, 2026-11-20): the team's own card must
+          // be complete — a blank anywhere on the OTHER team does not
+          // cost this team its bonus, exactly as on the workbook's
+          // per-team cards.
+          const mine = teams[t].map(p => sc(p.id, i));
+          if (mine.length > 0 && mine.every(s => s !== null) && mine.reduce((x, y) => x + y, 0) <= hp * mine.length) par[side[t]] += 1;
         }
       });
     }
@@ -441,10 +458,74 @@ function createEngine(pars, teams, scores, settings) {
     teams.team2.forEach(p => { moneyMap[p.id] = team2Amt; });
     return { rows, t1Bets, t2Bets, totalNet, team1Amt, team2Amt, betAmount: amt, money: moneyMap };
   };
+  // Bet-by-bet audit trail (scorekeeper only, 2026-11-20 — the online
+  // version of the workbook's Audit tab): replay the same press walk
+  // settle() runs and record, for every bet and hole, the two ball
+  // sums, who won the hole, the original bet's running status, how
+  // many presses are running, and the running tally of bets won in
+  // that nine. A bet a team cannot field on a hole is void there
+  // (an all-null row), exactly as the workbook's Audit tab shows it.
+  const auditTrail = () => {
+    const openBets = settings.betConfiguration.map(() => [0]);
+    const betsOut = settings.betConfiguration.map((bc) => ({ betNumber: bc.betNumber, description: bc.description, holes: [], total: { t1: 0, t2: 0 } }));
+    const counts = (bets) => ({ t1: bets.filter(d => d > 0).length, t2: bets.filter(d => d < 0).length });
+    let frontFinal = null;
+    for (let hole = 1; hole <= 18; hole++) {
+      const i = hole - 1, hp = COURSE.holes[i].par;
+      if (hole === 10) { frontFinal = openBets.map(counts); openBets.forEach((bets, bi) => { openBets[bi] = [0]; }); }
+      const winners = getHoleWinner(hole) || [];
+      const spawned = settings.betConfiguration.map(() => 0);
+      winners.forEach(x => {
+        const delta = x.winner === 'team1' ? 1 : x.winner === 'team2' ? -1 : 0;
+        if (delta === 0) return;
+        const bets = openBets[x.betIndex];
+        let presses = 0;
+        for (let k = 0; k < bets.length; k++) {
+          const prev = bets[k];
+          bets[k] = prev + delta;
+          if (Math.abs(bets[k]) === 2 && Math.abs(prev) < 2) presses++;
+        }
+        for (let k = 0; k < presses; k++) bets.push(0);
+        spawned[x.betIndex] = presses;
+      });
+      // Display sums, fielded exactly as getHoleWinner fields them.
+      let s1 = teams.team1.map(p => sc(p.id, i)).filter(s => s !== null).sort((a, b) => a - b);
+      let s2 = teams.team2.map(p => sc(p.id, i)).filter(s => s !== null).sort((a, b) => a - b);
+      if (holeComplete(i) && teams.hasOddPlayers) {
+        if (teams.teamWithExtra === 'team1' && s1.length > s2.length) s1 = s1.slice(0, -1);
+        else if (teams.teamWithExtra === 'team2' && s2.length > s1.length) s2 = s2.slice(0, -1);
+      }
+      settings.betConfiguration.forEach((bc, bi) => {
+        const a = bc.players.filter(p => p < s1.length).map(p => s1[p]);
+        const b = bc.players.filter(p => p < s2.length).map(p => s2[p]);
+        if (a.length < bc.players.length || b.length < bc.players.length) {
+          betsOut[bi].holes.push({ hole: hole, par: hp, t1: null, t2: null, winner: 'void', orig: null, presses: null, tally: null });
+          return;
+        }
+        const w = winners.find(x => x.betIndex === bi);
+        const c = counts(openBets[bi]);
+        betsOut[bi].holes.push({
+          hole: hole, par: hp,
+          t1: a.reduce((x, y) => x + y, 0), t2: b.reduce((x, y) => x + y, 0),
+          winner: w ? w.winner : 'tie',
+          orig: openBets[bi][0],
+          // Presses RUNNING on this hole, the workbook Audit tab's
+          // count: a press spawned by this hole starts play on the
+          // NEXT hole, so it is not counted yet. (A just-spawned
+          // press sits at 0, so the tally needs no such adjustment.)
+          presses: openBets[bi].length - 1 - spawned[bi],
+          tally: [c.t1, c.t2]
+        });
+      });
+    }
+    const backFinal = openBets.map(counts);
+    betsOut.forEach((bo, bi) => { bo.total = { t1: (frontFinal ? frontFinal[bi].t1 : 0) + backFinal[bi].t1, t2: (frontFinal ? frontFinal[bi].t2 : 0) + backFinal[bi].t2 }; });
+    return { bets: betsOut };
+  };
   const tally = (h) => { const r = settle(h); return { team1: r.t1Bets, team2: r.t2Bets }; };
   const calcMoney = (h = 18) => settle(h).money;
 
-  return { getHoleWinner: getHoleWinner, settle: settle, tally: tally, calcMoney: calcMoney, sc: sc, holeComplete: holeComplete };
+  return { getHoleWinner: getHoleWinner, settle: settle, tally: tally, calcMoney: calcMoney, sc: sc, holeComplete: holeComplete, auditTrail: auditTrail };
 }
 /* === ENGINE END === */
 
@@ -1266,7 +1347,7 @@ function renderSetupCard() {
   };
   var h = "<div class='card setupcard'>" +
     "<div class='sc-date'>⛳ " + esc(dstr) + "</div>" +
-    "<div class='sc-meta'><strong>" + money(e.betAmount) + "</strong> per bet · Birdie bonus <strong>" + (e.birdieBonus ? "ON" : "OFF") + "</strong> · Par or better <strong>" + (e.parOrBetterBonus ? "ON" : "OFF") + "</strong> · All Balls <strong>" +
+    "<div class='sc-meta'><strong>" + money(e.betAmount) + "</strong> per bet · Birdie bonus <strong>" + (e.birdieBonus ? "ON" : "OFF") + "</strong> · Team Par or Better <strong>" + (e.parOrBetterBonus ? "ON" : "OFF") + "</strong> · All Balls <strong>" +
       (e.allBalls ? "holes " + e.allBallsFront + " &amp; " + e.allBallsBack : "OFF") + "</strong></div>" +
     "<div class='sc-meta'>Bets: <strong>" + esc(betsTxt || "—") + "</strong></div>" +
     "<div class='sc-cols'>" + teamCol("Team 1", s.teams.team1, "") + teamCol("Team 2", s.teams.team2, "t2h") + "</div>";
@@ -1455,6 +1536,29 @@ function applyHighlights() {
     });
   });
 }
+/* Bet-by-bet audit view (v7.5): the workbook's Audit tab, rendered
+   from the engine's auditTrail — every bet, every hole: the ball
+   sums, who won the hole, the original bet's running status, the
+   presses running, and the running tally. A bet a team couldn't
+   field on a hole shows as void, exactly as the sheet shows it. */
+function auditHtml(engine) {
+  var a;
+  try { a = engine.auditTrail(); } catch (e) { return ""; }
+  if (!a || !a.bets.length) return "";
+  var h = "<details class='auditwrap'><summary>Bet-by-bet audit — how every bet was won</summary>";
+  a.bets.forEach(function (bet) {
+    h += "<h4>Bet " + bet.betNumber + ": " + esc(bet.description) + " — Team 1 " + bet.total.t1 + " – " + bet.total.t2 + " Team 2</h4>";
+    h += "<div class='scroll'><table class='audittable'><tr><th>Hole</th><th>Par</th><th>Team 1</th><th>Team 2</th><th>Won by</th><th>Original bet</th><th>Presses</th><th>Running tally</th></tr>";
+    bet.holes.forEach(function (r) {
+      if (r.winner === "void") { h += "<tr class='void'><td>" + r.hole + "</td><td>" + r.par + "</td><td>–</td><td>–</td><td>void</td><td>–</td><td>–</td><td>–</td></tr>"; return; }
+      var won = r.winner === "team1" ? "Team 1" : r.winner === "team2" ? "Team 2" : "Halved";
+      var orig = r.orig > 0 ? "Team 1 up " + r.orig : r.orig < 0 ? "Team 2 up " + (-r.orig) : "All square";
+      h += "<tr><td>" + r.hole + "</td><td>" + r.par + "</td><td>" + r.t1 + "</td><td>" + r.t2 + "</td><td>" + won + "</td><td>" + orig + "</td><td>" + r.presses + "</td><td>" + r.tally[0] + " – " + r.tally[1] + "</td></tr>";
+    });
+    h += "<tr class='audittotal'><td colspan='7'>Bet " + bet.betNumber + " total</td><td>Team 1 " + bet.total.t1 + " – " + bet.total.t2 + " Team 2</td></tr></table></div>";
+  });
+  return h + "</details>";
+}
 function renderResults() {
   var box = $("results");
   var built = currentEngine(), s = built.setup;
@@ -1491,6 +1595,7 @@ function renderResults() {
       parts.map(function (p) { return esc(p.name) + " (" + playedCount(p.id) + " holes)"; }).join(", ") +
       " — the FULL team amount above counts for them; no scoring stats are recorded for a partial round.</p>";
   }
+  h += auditHtml(built.engine);
   box.innerHTML = h;
 }
 
@@ -1659,6 +1764,23 @@ function pastCard(rec, teamNo, pars) {
   });
   return h + "</table></div>";
 }
+/* Rebuild an engine for a saved round (v7.5), so Past Rounds can
+   show the same bet-by-bet audit as a live round. Stored games
+   already carry app-shaped settings (betConfiguration) and scores
+   with nulls for unplayed holes; the odd-team fields are recomputed
+   from the team sizes when the record predates them. Any malformed
+   old record simply gets no audit — never break the list over it. */
+function pastEngine(rec, pars) {
+  try {
+    var st = rec.settings || {};
+    if (!st.betConfiguration || !st.betConfiguration.length) return null;
+    var odd = rec.teams.team1.length !== rec.teams.team2.length;
+    var teams = { team1: rec.teams.team1, team2: rec.teams.team2,
+      hasOddPlayers: odd,
+      teamWithExtra: !odd ? null : (rec.teams.team1.length > rec.teams.team2.length ? "team1" : "team2") };
+    return createEngine(pars, teams, rec.scores || {}, st);
+  } catch (e) { return null; }
+}
 function renderPast() {
   if (!S.games.length) { $("pastList").innerHTML = "<p class='note'>No saved rounds yet.</p>"; return; }
   var h = "";
@@ -1667,10 +1789,12 @@ function renderPast() {
     var amts = gameAmounts(rec);
     var d = chicagoDate(g.played_at);
     var pars = rec.breakdown && Array.isArray(rec.breakdown.pars) && rec.breakdown.pars.length === 18 ? rec.breakdown.pars : DEFAULT_PARS;
+    var pe = pastEngine(rec, pars);
     h += "<div class='pastitem' data-past='" + idx + "'><div class='ph'><span>" + esc(d) + "</span><span>" +
       rec.teams.team1.length + " v " + rec.teams.team2.length + "</span></div>" +
       "<div class='ph' style='font-weight:400'><span>Team 1 " + money(amts.t1) + "/player</span><span>Team 2 " + money(amts.t2) + "/player</span></div>" +
       "<div class='pastbody' id='past-" + idx + "' style='display:none'>" + pastCard(rec, 1, pars) + pastCard(rec, 2, pars) +
+      (pe ? auditHtml(pe) : "") +
       // Admin removal (v7): Jon's safety net for open submission — anyone
       // can submit, an admin can back a bad round out. Editors only; the
       // reversal math lives in buildRemovalUpdates (BUILDERS block).
