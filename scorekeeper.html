@@ -1783,6 +1783,23 @@ function auditHtml(engine) {
   try { a = engine.auditTrail(); } catch (e) { return ""; }
   if (!a || !a.bets.length) return "";
   var h = "<details class='auditwrap'><summary>Bet-by-bet audit — how every bet was won</summary>";
+  /* By-nine breakdown (v9.2, Jon 2026-11-21): how the bets stand for
+     every nine — each category's front-nine score, back-nine score
+     (the full settle minus the front), and total, from the engine's
+     own settle(9) / settle(18). */
+  var s9 = null, s18 = null;
+  try { s9 = engine.settle(9); s18 = engine.settle(18); } catch (e) { s9 = null; s18 = null; }
+  if (s9 && s18 && s18.rows.length) {
+    var front = {};
+    s9.rows.forEach(function (r) { front[r.label] = r; });
+    h += "<h4>How the bets stand by nine</h4><div class='scroll'><table class='audittable'><tr><th>Bet</th><th>Front 9</th><th>Back 9</th><th>Total</th></tr>";
+    s18.rows.forEach(function (r) {
+      var f = front[r.label] || { t1: 0, t2: 0 };
+      var label = r.label.replace("Birdie bonus", "Birdies").replace("All balls", "All Balls");
+      h += "<tr><td>" + esc(label) + "</td><td>" + f.t1 + " – " + f.t2 + "</td><td>" + (r.t1 - f.t1) + " – " + (r.t2 - f.t2) + "</td><td>" + r.t1 + " – " + r.t2 + "</td></tr>";
+    });
+    h += "<tr class='audittotal'><td>All bets</td><td>" + s9.t1Bets + " – " + s9.t2Bets + "</td><td>" + (s18.t1Bets - s9.t1Bets) + " – " + (s18.t2Bets - s9.t2Bets) + "</td><td>" + s18.t1Bets + " – " + s18.t2Bets + "</td></tr></table></div>";
+  }
   a.bets.forEach(function (bet) {
     h += "<h4>Bet " + bet.betNumber + ": " + esc(bet.description) + " — Team 1 " + bet.total.t1 + " – " + bet.total.t2 + " Team 2</h4>";
     h += "<div class='scroll'><table class='audittable'><tr><th>Hole</th><th>Par</th><th>Team 1</th><th>Team 2</th><th>Won by</th><th>Original bet</th><th>Presses</th><th>Running tally</th></tr>";
