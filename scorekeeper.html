@@ -87,6 +87,14 @@
   table.grid input.eag { border: 2px solid #b8860b; border-radius: 50%; font-weight: 700; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #b8860b; }
   table.grid td.abcol, table.grid th.abcol { background: #fdf3d7; }
   table.grid th.abh::after { content: " AB"; font-size: 9px; color: #8a5a12; font-weight: 700; }
+  /* hole decorations (v8.1): a team's scores go green on a hole it made
+     Team Par or Better; the All Balls bottom row shows the team's total
+     for the hole, blue for a win, red for a loss (no color for a tie). */
+  table.grid td.pob { background: #c6efce; }
+  table.grid input.pob { background: #c6efce; }
+  table.grid td.abwin { background: #bdd7ee; color: #1f4e79; font-weight: 700; }
+  table.grid td.ablose { background: #ffc7ce; color: #9c0006; font-weight: 700; }
+  table.grid tr.abrow td { font-weight: 700; }
   .circ { display: inline-block; min-width: 25px; line-height: 25px; padding: 0 2px; border: 2px solid #b8860b; border-radius: 50%; text-align: center; font-weight: 700; }
   .circ.eag { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #b8860b; }
   /* setup card (v2): a clean, shareable picture of the day's setup */
@@ -1565,7 +1573,15 @@ function gridTable(teamNo, plist) {
   for (var k = 0; k < 9; k++) h += "<td></td>";
   h += "<td id='tt-out-" + teamNo + "'></td>";
   for (var m = 0; m < 9; m++) h += "<td></td>";
-  h += "<td id='tt-in-" + teamNo + "'></td><td id='tt-tot-" + teamNo + "'></td></tr></table></div>";
+  h += "<td id='tt-in-" + teamNo + "'></td><td id='tt-tot-" + teamNo + "'></td></tr>";
+  /* All Balls bottom row (v8.1): filled live by applyHighlights —
+     the team's total at the bottom of each All Balls hole, blue for
+     a win, red for a loss. Hidden while All Balls is off. */
+  h += "<tr class='abrow' id='abrow-" + teamNo + "' style='display:none'><td>All Balls</td>";
+  for (var a1 = 1; a1 <= 9; a1++) h += "<td id='ab-" + teamNo + "-" + a1 + "'></td>";
+  h += "<td class='tot'></td>";
+  for (var a2 = 10; a2 <= 18; a2++) h += "<td id='ab-" + teamNo + "-" + a2 + "'></td>";
+  h += "<td class='tot'></td><td class='tot'></td></tr></table></div>";
   return h;
 }
 function renderGrids() {
@@ -1662,13 +1678,35 @@ function applyHighlights() {
   var e = S.entry;
   var ab = {};
   if (e.allBalls) { ab[e.allBallsFront] = true; ab[e.allBallsBack] = true; }
+  /* Hole decorations (v8.1): green for a team's Team Par or Better
+     holes, and the All Balls bottom row (totals, blue win / red loss). */
+  var s8 = currentSetup();
+  var dec = holeDecor(e.pars, s8.teams, s8.scores, { parOrBetterBonus: e.parOrBetterBonus, allBalls: e.allBalls, allBallsFront: e.allBallsFront, allBallsBack: e.allBallsBack });
   Array.prototype.forEach.call(document.querySelectorAll("#grids input[data-pid]"), function (inp) {
     var hole = Number(inp.getAttribute("data-hole"));
-    var arr = S.entry.scores[Number(inp.getAttribute("data-pid"))];
+    var pid = Number(inp.getAttribute("data-pid"));
+    var arr = S.entry.scores[pid];
     var s = arr ? arr[hole] : null;
     var par = e.pars[hole];
     inp.classList.toggle("eag", s !== null && s !== undefined && par - s >= 2);
     inp.classList.toggle("bird", s !== null && s !== undefined && par - s === 1);
+    var tn = S.entry.assign[pid] ? S.entry.assign[pid].team : 0;
+    inp.classList.toggle("pob", !!(tn && dec.pob[tn][hole + 1]));
+  });
+  [1, 2].forEach(function (tn) {
+    var row = $("abrow-" + tn);
+    if (!row) return;
+    row.style.display = e.allBalls ? "" : "none";
+    if (!e.allBalls) return;
+    [e.allBallsFront, e.allBallsBack].forEach(function (hole) {
+      var cell = $("ab-" + tn + "-" + hole);
+      if (!cell) return;
+      var d = dec.ab[hole];
+      if (!d) { cell.textContent = ""; cell.classList.remove("abwin"); cell.classList.remove("ablose"); return; }
+      cell.textContent = tn === 1 ? d.t1 : d.t2;
+      cell.classList.toggle("abwin", d.win === tn);
+      cell.classList.toggle("ablose", d.win !== 0 && d.win !== tn);
+    });
   });
   Array.prototype.forEach.call(document.querySelectorAll("#grids table.grid"), function (tbl) {
     if (!tbl.rows.length) return;
@@ -1911,6 +1949,35 @@ function setupHtml(rec) {
   });
   return h + "</div>";
 }
+/* Hole decorations (v8.1, Jon 2026-11-20): computed from the scores
+   themselves, mirroring the engine — Team Par or Better is per team
+   (the hole must be complete for that team and its total par or
+   better, the aggregate rule); an All Balls hole counts only when
+   BOTH teams are complete on it, and its totals are the full sums. */
+function holeDecor(pars, teams, scores, settings) {
+  var pob = { 1: {}, 2: {} }, ab = {};
+  var sum = function (plist, i) {
+    var tot = 0, n = 0;
+    plist.forEach(function (p) { var v = (scores[p.id] || [])[i]; if (v !== null && v !== undefined) { tot += v; n++; } });
+    return { tot: tot, n: n };
+  };
+  for (var i = 0; i < 18; i++) {
+    if (settings.parOrBetterBonus) {
+      [1, 2].forEach(function (tn) {
+        var plist = tn === 1 ? teams.team1 : teams.team2;
+        var s = sum(plist, i);
+        if (plist.length > 0 && s.n === plist.length && s.tot <= pars[i] * plist.length) pob[tn][i + 1] = true;
+      });
+    }
+    if (settings.allBalls && (i + 1 === settings.allBallsFront || i + 1 === settings.allBallsBack)) {
+      var a = sum(teams.team1, i), b = sum(teams.team2, i);
+      if (teams.team1.length > 0 && teams.team2.length > 0 && a.n === teams.team1.length && b.n === teams.team2.length) {
+        ab[i + 1] = { t1: a.tot, t2: b.tot, win: a.tot < b.tot ? 1 : a.tot > b.tot ? 2 : 0 };
+      }
+    }
+  }
+  return { pob: pob, ab: ab };
+}
 function pastCard(rec, teamNo, pars) {
   var plist = teamNo === 1 ? rec.teams.team1 : rec.teams.team2;
   // Highlights (v2): ring birdies/eagles against THIS game's pars, and tint
@@ -1919,6 +1986,7 @@ function pastCard(rec, teamNo, pars) {
   var ab = {};
   if (st.allBalls) { if (st.allBallsFront) ab[st.allBallsFront] = true; if (st.allBallsBack) ab[st.allBallsBack] = true; }
   var abTd = function (hole) { return ab[hole] ? " class='abcol'" : ""; };
+  var dec = holeDecor(pars, rec.teams, rec.scores || {}, st);
   var cellVal = function (v, hole) {
     if (v == null) return "–";
     var under = pars[hole - 1] - v;
@@ -1942,10 +2010,23 @@ function pastCard(rec, teamNo, pars) {
     // snapshots the full player object, tees included, into games.teams,
     // so this is the tee he played THAT day, not his current roster tee.
     h += "<tr><td>" + esc(p.name) + " <span style='color:#778;font-weight:400'>· " + teeLetter(p.tees) + "</span></td>";
-    sc.forEach(function (v, i) { h += "<td" + abTd(i + 1) + ">" + cellVal(v, i + 1) + "</td>"; if (i === 8) h += "<td class='tot'>" + o + "</td>"; });
+    sc.forEach(function (v, i) { var cls = []; if (ab[i + 1]) cls.push("abcol"); if (dec.pob[teamNo][i + 1]) cls.push("pob"); h += "<td" + (cls.length ? " class='" + cls.join(" ") + "'" : "") + ">" + cellVal(v, i + 1) + "</td>"; if (i === 8) h += "<td class='tot'>" + o + "</td>"; });
     var mv = rec.moneyResults ? rec.moneyResults[p.id] : null;
     h += "<td class='tot'>" + ii + "</td><td class='tot'>" + (o + ii) + "</td><td class='" + (mv < 0 ? "neg" : "") + "'>" + (mv == null ? "—" : money(mv)) + "</td></tr>";
   });
+  /* All Balls bottom row (v8.1): the team's total at the bottom of
+     each All Balls hole, blue for a win, red for a loss, no color
+     for a tie — the workbook card's row, online. */
+  if (st.allBalls) {
+    h += "<tr class='abrow'><td>All Balls</td>";
+    for (var hi = 1; hi <= 18; hi++) {
+      var d = dec.ab[hi];
+      if (!d) h += "<td></td>";
+      else { var val = teamNo === 1 ? d.t1 : d.t2; var wc = d.win === teamNo ? "abwin" : (d.win === 0 ? "" : "ablose"); h += "<td" + (wc ? " class='" + wc + "'" : "") + ">" + val + "</td>"; }
+      if (hi === 9) h += "<td class='tot'></td>";
+    }
+    h += "<td class='tot'></td><td class='tot'></td></tr>";
+  }
   return h + "</table></div>";
 }
 /* Rebuild an engine for a saved round (v7.5), so Past Rounds can
