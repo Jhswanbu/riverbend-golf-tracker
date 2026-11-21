@@ -100,7 +100,7 @@
      the 880px column, tighter cards, smaller score cells so more
      holes fit across, and the home buttons in a row. Portrait keeps
      the stacked layout above. */
-  @media (orientation: landscape) and (max-height: 520px) {
+  @media (orientation: landscape) and (max-width: 1024px) {
     body { padding: 8px; }
     main { max-width: none; }
     .card { padding: 10px 12px; margin: 8px 0; }
@@ -110,6 +110,14 @@
     table.grid input { width: 36px; padding: 6px 1px; }
     table.grid input.par { width: 36px; }
   }
+  /* fit-all-holes compact mode (v9.4, Jon 2026-11-21): shrinks the
+     score grids so all 18 holes fit the screen width at once, in
+     either orientation — for browsers that do not rotate the page. */
+  body.fit table.grid { min-width: 0; font-size: 12px; }
+  body.fit table.grid th, body.fit table.grid td { padding: 3px 1px; }
+  body.fit table.grid th:first-child, body.fit table.grid td:first-child { min-width: 72px; font-size: 12px; }
+  body.fit table.grid input { width: 27px; padding: 5px 0; font-size: 13px; }
+  body.fit table.grid input.par { width: 27px; }
   .circ { display: inline-block; min-width: 25px; line-height: 25px; padding: 0 2px; border: 2px solid #b8860b; border-radius: 50%; text-align: center; font-weight: 700; }
   .circ.eag { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #b8860b; }
   /* setup card (v2): a clean, shareable picture of the day's setup */
@@ -149,6 +157,7 @@
 <main>
   <h1>⛳ Riverbend Scorekeeper</h1>
   <p class="note">The whole field's scores, entered like the spreadsheet. <strong>Anyone can enter and submit a round — no login needed</strong>; it counts right away, and an admin is alerted for every submission. No live scoring.</p>
+  <p style="margin:8px 0 0"><button id="fitBtn" class="secondary small">Fit all holes on screen: Off</button></p>
 
   <!-- APP SHELL (always present in v7; signed-out visitors get the open views) -->
   <div id="appShell">
@@ -1245,6 +1254,22 @@ $("btnDiscardDraft").addEventListener("click", function () {
   refreshDraftBar();
   showMsg($("saveOk"), "ok", "Saved setup discarded — starting fresh.");
 });
+/* Fit-all-holes compact mode (v9.4, Jon 2026-11-21): shrinks the score
+   grids so all 18 holes fit the screen width at once, in either
+   orientation and in any browser; the choice is remembered per device. */
+function applyFit() {
+  var on = false;
+  try { on = localStorage.getItem("rbcc-fit") === "1"; } catch (e) {}
+  document.body.classList.toggle("fit", on);
+  var b = $("fitBtn");
+  if (b) b.textContent = "Fit all holes on screen: " + (on ? "On" : "Off");
+}
+$("fitBtn").addEventListener("click", function () {
+  var on = !document.body.classList.contains("fit");
+  try { localStorage.setItem("rbcc-fit", on ? "1" : "0"); } catch (e) {}
+  applyFit();
+});
+applyFit();
 
 /* ================= navigation (v8) =================
    The tab bar is gone: the page starts on a home screen with three
