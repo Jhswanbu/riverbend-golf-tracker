@@ -118,6 +118,10 @@
   body.fit table.grid th:first-child, body.fit table.grid td:first-child { min-width: 72px; font-size: 12px; }
   body.fit table.grid input { width: 27px; padding: 5px 0; font-size: 13px; }
   body.fit table.grid input.par { width: 27px; }
+  /* the bet-by-bet audit too (v9.5, Jon 2026-11-21): its tables carry
+     a 620px minimum width, which is what forces the sideways scroll */
+  body.fit table.audittable { min-width: 0; font-size: 11.5px; }
+  body.fit table.audittable th, body.fit table.audittable td { padding: 3px 2px; }
   .circ { display: inline-block; min-width: 25px; line-height: 25px; padding: 0 2px; border: 2px solid #b8860b; border-radius: 50%; text-align: center; font-weight: 700; }
   .circ.eag { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #b8860b; }
   /* setup card (v2): a clean, shareable picture of the day's setup */
