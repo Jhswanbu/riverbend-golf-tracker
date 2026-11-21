@@ -122,21 +122,17 @@
 <body>
 <main>
   <h1>⛳ Riverbend Scorekeeper</h1>
-  <p class="note">The whole field's scores, entered like the spreadsheet. <strong>Anyone can enter and submit a round — no login needed</strong>; it counts right away, and an admin is alerted for every submission. Admins and scorekeepers sign in to manage rounds. No live scoring.</p>
+  <p class="note">The whole field's scores, entered like the spreadsheet. <strong>Anyone can enter and submit a round — no login needed</strong>; it counts right away, and an admin is alerted for every submission. No live scoring.</p>
 
-  <!-- ADMIN SIGN-IN (v7): shown when signed OUT. The app itself is open —
-       entering scores, uploading a spreadsheet, the setup card, and the
-       season tally all work without an account. Signing in is only for
-       managing rounds. -->
-  <div id="adminCard" class="card" style="display:none">
-    <h2 style="margin-top:0">Admin sign-in</h2>
-    <p class="note" style="margin-top:0">You don't need an account to enter scores. Sign in (admins and scorekeepers) for <strong>Past Rounds</strong>, <strong>adding players</strong>, and <strong>removing rounds</strong>.</p>
-    <label class="f" for="liEmail">Email</label>
-    <input type="email" id="liEmail" autocomplete="username" placeholder="you@example.com">
-    <label class="f" for="liPass">Password</label>
-    <input type="password" id="liPass" autocomplete="current-password" placeholder="Password">
-    <button id="btnLogin">Sign in</button>
-    <div id="loginMsg" class="msg" role="status"></div>
+  <!-- ROUND BY DATE (v7.6, Jon 2026-11-20): the page opens by asking
+       which date you are looking for, and every visitor sees the same
+       data for that date's round — saved rounds are public and
+       read-only here. The admin sign-in moved to its own tab; only
+       admins can adjust a past round. -->
+  <div class="card" id="dateCard">
+    <h2 style="margin-top:0">Which date are you looking for?</h2>
+    <input type="date" id="roundDate">
+    <div id="roundView" style="margin-top:10px"><p class="note">Loading…</p></div>
   </div>
 
   <!-- APP SHELL (always present in v7; signed-out visitors get the open tabs) -->
@@ -145,13 +141,6 @@
       <div class="who">
         <span class="em" id="draftMsg"></span>
         <button id="btnDiscardDraft" class="secondary small">Discard saved setup</button>
-      </div>
-    </div>
-    <div class="card" id="whoBar" style="padding:10px 16px;display:none">
-      <div class="who">
-        <span class="em" id="whoEmail"></span>
-        <span class="em" id="whoRole"></span>
-        <button id="btnLogout" class="secondary small">Sign out</button>
       </div>
     </div>
     <div id="roNote"></div>
@@ -163,6 +152,7 @@
       <button id="tabSetup">Setup Card</button>
       <button id="tabTally">Season Tally</button>
       <button id="tabPast">Past Rounds</button>
+      <button id="tabAdmin">Admin</button>
     </div>
 
     <!-- ENTER SCORES -->
@@ -250,6 +240,30 @@
     <section id="viewPast" style="display:none">
       <h2>Past Rounds</h2>
       <div id="pastList"></div>
+    </section>
+
+    <!-- ADMIN (v7.6): the sign-in lives on its own tab. Signing in is
+         only for adjusting past rounds and adding players — viewing a
+         round and entering scores never need a login. -->
+    <section id="viewAdmin" style="display:none">
+      <h2>Admin</h2>
+      <div id="adminCard" class="card" style="display:none">
+        <h3 style="margin-top:0">Admin sign-in</h3>
+        <p class="note" style="margin-top:0">Admins and scorekeepers sign in to <strong>adjust past rounds</strong> (Past Rounds tab) and <strong>add players</strong>. Everyone else never needs this — pick a date at the top to see a round, or enter scores on the Enter Scores tab.</p>
+        <label class="f" for="liEmail">Email</label>
+        <input type="email" id="liEmail" autocomplete="username" placeholder="you@example.com">
+        <label class="f" for="liPass">Password</label>
+        <input type="password" id="liPass" autocomplete="current-password" placeholder="Password">
+        <button id="btnLogin">Sign in</button>
+        <div id="loginMsg" class="msg" role="status"></div>
+      </div>
+      <div class="card" id="whoBar" style="padding:10px 16px;display:none">
+        <div class="who">
+          <span class="em" id="whoEmail"></span>
+          <span class="em" id="whoRole"></span>
+          <button id="btnLogout" class="secondary small">Sign out</button>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -1184,11 +1198,13 @@ function switchView(v) {
   $("viewSetup").style.display = v === "setup" ? "" : "none";
   $("viewTally").style.display = v === "tally" ? "" : "none";
   $("viewPast").style.display = v === "past" ? "" : "none";
+  $("viewAdmin").style.display = v === "admin" ? "" : "none";
   $("tabEnter").className = v === "enter" ? "on" : "";
   $("tabUpload").className = v === "upload" ? "on" : "";
   $("tabSetup").className = v === "setup" ? "on" : "";
   $("tabTally").className = v === "tally" ? "on" : "";
   $("tabPast").className = v === "past" ? "on" : "";
+  $("tabAdmin").className = v === "admin" ? "on" : "";
   if (v === "setup") renderSetupCard();
   if (v === "tally") renderTally();
   if (v === "past") renderPast();
@@ -1198,6 +1214,88 @@ $("tabUpload").addEventListener("click", function () { switchView("upload"); });
 $("tabSetup").addEventListener("click", function () { switchView("setup"); });
 $("tabTally").addEventListener("click", function () { switchView("tally"); });
 $("tabPast").addEventListener("click", function () { switchView("past"); });
+$("tabAdmin").addEventListener("click", function () { switchView("admin"); });
+
+/* ================= round by date (v7.6) =================
+   Jon (2026-11-20): the page opens by asking which date you are
+   looking for, and every person who visits sees the same data for
+   that date's round. A saved round is shown read-only — from the
+   signed-in games list when there is one, otherwise from the
+   guest_round_by_date RPC, which serves the same round to visitors
+   with no account. Only admins can adjust a past round (Past
+   Rounds tab, Admin sign-in). */
+var roundCache = {};   // dateStr -> rec, or null once known to have no saved round
+var roundFetch = {};   // dateStr -> true while its RPC fetch is in flight
+async function rpcRoundByDate(ds) {
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/guest_round_by_date", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY },
+      body: JSON.stringify({ p_date: ds })
+    });
+    if (!r.ok) return null;
+    var j = await r.json();
+    if (!j || !j.teams) return null;
+    return { date: j.date, teams: j.teams, scores: j.scores, settings: j.settings, groups: j.groups || [], moneyResults: j.moneyResults, breakdown: j.breakdown };
+  } catch (e) { return null; }
+}
+function findRound(ds) {
+  if (Object.prototype.hasOwnProperty.call(roundCache, ds)) return roundCache[ds];
+  var g = null;
+  for (var i = 0; i < S.games.length; i++) { if (chicagoDate(S.games[i].played_at) === ds) { g = S.games[i]; break; } }
+  if (g) { roundCache[ds] = gameRowToRecord(g); return roundCache[ds]; }
+  if (!roundFetch[ds]) {
+    roundFetch[ds] = true;
+    rpcRoundByDate(ds).then(function (rec) { roundCache[ds] = rec; delete roundFetch[ds]; renderRoundView(); });
+  }
+  return undefined;   // still loading
+}
+function renderRoundView() {
+  var box = $("roundView");
+  if (!box) return;
+  var ds = ($("roundDate") && $("roundDate").value) || todayChicago();
+  var rec = findRound(ds);
+  if (rec === undefined) { box.innerHTML = "<p class='note'>Loading that round…</p>"; return; }
+  if (rec) {
+    var pars = rec.breakdown && Array.isArray(rec.breakdown.pars) && rec.breakdown.pars.length === 18 ? rec.breakdown.pars : DEFAULT_PARS;
+    var amts = gameAmounts(rec);
+    var pe = pastEngine(rec, pars);
+    box.innerHTML =
+      "<p class='team' style='font-weight:700'>Saved round — Team 1 " + money(amts.t1) + "/player · Team 2 " + money(amts.t2) + "/player</p>" +
+      pastCard(rec, 1, pars) + pastCard(rec, 2, pars) +
+      (pe ? auditHtml(pe) : "") +
+      "<p class='note'>Everyone who picks this date sees this same round. Only an admin can adjust a past round (Admin tab, then Past Rounds).</p>";
+    return;
+  }
+  if (S.entry.date === ds) {
+    var ps = assignedPlayers();
+    var started = ps.filter(function (p) { return playedCount(p.id) > 0; }).length;
+    box.innerHTML = "<p class='note'>No saved round for " + ds + " yet — this date's round is being entered now (" + started + " of " + ps.length + " assigned players have scores). Everyone entering sees the same shared entry.</p>" +
+      "<button class='secondary' id='rvEnter'>Open score entry</button>";
+    $("rvEnter").addEventListener("click", function () { switchView("enter"); });
+  } else {
+    box.innerHTML = "<p class='note'>No round saved for " + ds + ".</p>" +
+      "<button class='secondary' id='rvStart'>Start entering this round</button>";
+    $("rvStart").addEventListener("click", function () { startEntryForDate(ds); });
+  }
+}
+function startEntryForDate(ds) {
+  var e = S.entry;
+  var hasContent = Object.keys(e.assign || {}).length > 0 || Object.keys(e.scores || {}).length > 0;
+  if (hasContent && e.date !== ds && !window.confirm("The entry in progress is for " + e.date + ". Start a fresh entry for " + ds + "? The in-progress entry will be discarded.")) return;
+  clearDraft();
+  clearSharedDraft();
+  S.entry = freshEntry();
+  S.entry.date = ds;
+  persistDraft();
+  scheduleSharedSave();
+  renderAll();
+  applyReadOnly();
+  refreshDraftBar();
+  switchView("enter");
+}
+$("roundDate").value = todayChicago();
+$("roundDate").addEventListener("change", renderRoundView);
 
 /* ================= enter view rendering ================= */
 function renderAll() {
@@ -1210,6 +1308,7 @@ function renderAll() {
   $("inAbB").value = S.entry.allBallsBack;
   renderRoster(); renderBets(); renderGrids(); updateDerived(); renderTally(); renderPast();
   applyReadOnly();
+  renderRoundView();
 }
 function applyReadOnly() {
   $("addPlayerBox").style.display = S.canEdit ? "" : "none";
@@ -1475,6 +1574,40 @@ $("grids").addEventListener("change", function (ev) {
     updateDerived();
   }
 });
+/* Excel-style movement in the score grids (v7.6): Tab, Enter and
+   the arrow keys move cell to cell — Tab and Enter go across a
+   player's holes to the next hole (Shift+Tab goes back), then on
+   to the next player — and a cell's contents are selected when it
+   gains focus, so typing replaces, the way the spreadsheet
+   behaves. Moving focus fires the change handler above, so every
+   move also commits the cell just left. Tab is intercepted only
+   while another grid cell follows; at the last cell it keeps its
+   normal job and moves on out of the grid. */
+$("grids").addEventListener("keydown", function (ev) {
+  var t = ev.target;
+  if (!t.hasAttribute || (!t.hasAttribute("data-pid") && !t.hasAttribute("data-par"))) return;
+  var inputs = Array.prototype.slice.call(document.querySelectorAll("#grids input[data-pid], #grids input[data-par]"));
+  var idx = inputs.indexOf(t);
+  if (idx < 0) return;
+  if (ev.key === "Tab") {
+    var nxt = inputs[idx + (ev.shiftKey ? -1 : 1)];
+    if (nxt) { ev.preventDefault(); nxt.focus(); if (nxt.select) nxt.select(); }
+    return;
+  }
+  var move = null;
+  if (ev.key === "Enter" || ev.key === "ArrowRight") { ev.preventDefault(); move = inputs[idx + 1]; }
+  else if (ev.key === "ArrowLeft") { ev.preventDefault(); move = inputs[idx - 1]; }
+  else if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+    ev.preventDefault();
+    var row = t.closest("tr");
+    var cellIdx = Array.prototype.indexOf.call(row.cells, t.closest("td"));
+    var rows = Array.prototype.slice.call(t.closest("table").querySelectorAll("tr"));
+    var ri = rows.indexOf(row) + (ev.key === "ArrowDown" ? 1 : -1);
+    if (rows[ri] && rows[ri].cells[cellIdx]) { var inp = rows[ri].cells[cellIdx].querySelector("input"); if (inp) move = inp; }
+  }
+  if (move) { move.focus(); if (move.select) move.select(); }
+});
+$("grids").addEventListener("focusin", function (ev) { if (ev.target.select) ev.target.select(); });
 
 /* Recompute row/team totals + results without touching the inputs. */
 function updateDerived() {
@@ -1697,10 +1830,14 @@ $("btnConfirmSave").addEventListener("click", async function () {
   $("confirmModal").className = "modal";
   pendingPayload = null;
   var serverMsg = (out.j && out.j.message) || "Round submitted.";
+  var savedDate = S.entry.date;
   S.entry = freshEntry();
   clearDraft();
   clearSharedDraft();
   if (S.user) await loadAll(); else await loadAnon();
+  delete roundCache[savedDate];
+  $("roundDate").value = savedDate;
+  renderRoundView();
   switchView("tally");
   showMsg($("saveOk"), "ok", serverMsg);
   window.scrollTo(0, 0);
@@ -1865,6 +2002,8 @@ $("btnConfirmRemove").addEventListener("click", async function () {
   pendingRemove = null;
   var d = chicagoDate(g.played_at);
   await loadAll();
+  delete roundCache[d];
+  renderRoundView();
   switchView("past");
   showMsg($("saveOk"), "ok", "Round for " + d + " removed — season totals backed out.");
   window.scrollTo(0, 0);
