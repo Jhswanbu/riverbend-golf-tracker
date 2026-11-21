@@ -172,7 +172,7 @@
         <p class="team" id="teamCounts" style="font-weight:700;margin-top:10px"></p>
         <div id="addPlayerBox" style="display:none;border-top:1px solid #e3eae3;margin-top:12px;padding-top:4px">
           <h3>Add a player</h3>
-          <p class="note" style="margin-top:0">Someone new playing today? Add them to the roster here — they can be put on a team right away. (Admins and scorekeepers only.)</p>
+          <p class="note" style="margin-top:0">Someone new playing today? Add them here and they can be put on a team right away. Signed-in admins and scorekeepers add them to the roster permanently; otherwise they're added for this round and join the roster when the round is saved.</p>
           <div class="grid2">
             <div><label class="f" for="npName">New player name</label><input type="text" id="npName" placeholder="First Last" autocomplete="off"></div>
             <div><label class="f" for="npTees">Tees</label><select id="npTees"><option value="White" selected>White</option><option value="Blue">Blue</option><option value="Combo">Combo</option><option value="Red">Red</option></select></div>
@@ -204,6 +204,11 @@
         <h2 style="margin-top:0">3 · Scores</h2>
         <p class="note" style="margin-top:0">Par row is editable — change it when the group plays a different course.</p>
         <div id="grids"></div>
+      </div>
+
+      <div class="card" id="liveCard">
+        <h2 style="margin-top:0">Live scoring</h2>
+        <div id="liveScoring"><p class="note">The bets tally here as scores are entered — it fills in once the first hole is complete for both teams.</p></div>
       </div>
 
       <div class="card" id="resultsCard">
@@ -811,8 +816,20 @@ function freshEntry() {
     betsTouched: false,               // set on any manual bet add/remove/edit; from then on team changes NEVER rewrite the config (E37 rule)
     birdieBonus: true,
     parOrBetterBonus: true,
-    allBalls: true, allBallsFront: 5, allBallsBack: 18
+    allBalls: true, allBallsFront: 5, allBallsBack: 18,
+    newPlayers: []                    // players added from the app for this round (v9): {id, name, tees} — carried in the entry so drafts keep them; the save endpoint puts them on the roster permanently
   };
+}
+/* Merge this entry's app-added players into the in-memory roster
+   (v9). Runs on every render, so a draft restored on any device
+   brings its new players with it. */
+function ensureEntryPlayers() {
+  (S.entry.newPlayers || []).forEach(function (np) {
+    if (!S.players.some(function (p) { return p.id === np.id; })) {
+      S.players.push({ id: np.id, name: np.name, tees: np.tees, ghinNumber: "", handicapIndex: null, photoUrl: "", email: "", appRole: "player", stats: { rounds: 0, avgScore: 0, lowScore: null, highScore: null, moneyWon: 0 } });
+    }
+  });
+  S.players.sort(function (a, b) { return a.name.localeCompare(b.name); });
 }
 S.entry = freshEntry();
 
@@ -1326,6 +1343,7 @@ $("roundDate").addEventListener("change", renderRoundView);
 
 /* ================= enter view rendering ================= */
 function renderAll() {
+  ensureEntryPlayers();
   $("inDate").value = S.entry.date;
   $("inBetAmt").value = S.entry.betAmount;
   $("inBirdie").checked = S.entry.birdieBonus;
@@ -1338,7 +1356,7 @@ function renderAll() {
   renderRoundView();
 }
 function applyReadOnly() {
-  $("addPlayerBox").style.display = S.canEdit ? "" : "none";
+  $("addPlayerBox").style.display = "";   // v9: adding a player from the app is for everyone — admins write the roster directly, everyone else adds for this round (see the handler)
   var controls = document.querySelectorAll("#viewEnter input, #viewEnter select, #viewEnter button");
   if (S.user && !S.canEdit) {
     // A signed-in VIEWER is deliberately read-only (viewer is an account
@@ -1414,16 +1432,28 @@ $("roster").addEventListener("change", function (ev) {
 });
 $("inDate").addEventListener("change", function () { S.entry.date = this.value || todayChicago(); persistDraft(); refreshDraftBar(); });
 
-/* Add a player (v2): admin/scorekeeper only. Inserts the same row shape the
-   submit endpoint creates for a new player, then reloads the roster so the
-   new name is ready to assign. Duplicate names (any casing) are refused. */
+/* Add a player (v2; open to everyone v9, Jon 2026-11-21). Admins and
+   scorekeepers insert the same row shape the submit endpoint creates
+   for a new player, then reload the roster. Everyone else adds the
+   player for THIS round — assignable and scoreable immediately — and
+   the round-save endpoint puts them on the roster permanently under
+   this exact name (it creates players by name). Duplicate names (any
+   casing) are refused either way. */
 $("btnAddPlayer").addEventListener("click", async function () {
   var msg = $("npMsg");
-  if (!S.canEdit) { showMsg(msg, "err", "Only admins and scorekeepers can add players."); return; }
   var name = $("npName").value.replace(/\s+/g, " ").trim();
   if (!name) { showMsg(msg, "err", "Type the new player's name first."); return; }
   var dup = S.players.some(function (p) { return p.name.toLowerCase() === name.toLowerCase(); });
   if (dup) { showMsg(msg, "err", name + " is already on the roster."); return; }
+  if (!S.canEdit) {
+    var np = { id: Date.now(), name: name, tees: $("npTees").value || "White" };
+    S.entry.newPlayers.push(np);
+    ensureEntryPlayers();
+    $("npName").value = "";
+    renderRoster(); renderGrids(); updateDerived(); applyReadOnly();
+    showMsg(msg, "ok", "Added " + name + " for this round — tap their name in the list above to put them on a team. They join the roster permanently when the round is saved.");
+    return;
+  }
   var btn = this;
   btn.disabled = true; btn.textContent = "Adding…";
   var row = { id: Date.now(), name: name, tees: $("npTees").value || "White", rounds: 0, avg_score: 0, low_score: null, high_score: null, money_won: 0 };
@@ -1665,6 +1695,7 @@ function updateDerived() {
     if (to) { to.textContent = any ? tOut : ""; $("tt-in-" + tn).textContent = any ? tIn : ""; $("tt-tot-" + tn).textContent = any ? (tOut + tIn) : ""; }
   });
   renderResults();
+  renderLive();
   applyHighlights();
   if (S.view === "setup") renderSetupCard();
   persistDraft();
@@ -1788,6 +1819,53 @@ function renderResults() {
   }
   h += auditHtml(built.engine);
   box.innerHTML = h;
+}
+
+/* Live scoring (v9, Jon 2026-11-21): tally the bets AS they are
+   entered — each bet's points as they stand (the audit trail's
+   totals: banked nines plus the live nine at its current state) and
+   its live status (original bet + presses running), the bonus
+   categories so far, and the money if the round ended right now.
+   Recomputed on every score change via updateDerived. */
+function renderLive() {
+  var box = $("liveScoring");
+  if (!box) return;
+  var built = currentEngine(), s = built.setup;
+  if (s.teams.team1.length < 2 || s.teams.team2.length < 2) {
+    box.innerHTML = "<p class='note'>The bets tally here as scores are entered — assign at least 2 players to each team first.</p>";
+    return;
+  }
+  var complete = 0;
+  for (var h = 0; h < 18; h++) {
+    var all = true;
+    s.teams.team1.concat(s.teams.team2).forEach(function (p) { var v = (s.scores[p.id] || [])[h]; if (v === null || v === undefined) all = false; });
+    if (all) complete++;
+  }
+  if (!complete) {
+    box.innerHTML = "<p class='note'>The bets tally here as scores are entered — it fills in once the first hole is complete for both teams.</p>";
+    return;
+  }
+  var eng = built.engine;
+  var a = null;
+  try { a = eng.auditTrail(); } catch (e) { a = null; }
+  var out = "<p class='note' style='margin-top:0'>Through " + complete + " complete hole" + (complete === 1 ? "" : "s") + " — as it stands now:</p>";
+  if (a && a.bets.length) {
+    out += "<table><tr><th>Bet</th><th>Points</th><th>Status</th></tr>";
+    a.bets.forEach(function (bet) {
+      var last = null;
+      bet.holes.forEach(function (r) { if (r.winner !== "void") last = r; });
+      if (!last) { out += "<tr><td>Bet " + bet.betNumber + ": " + esc(bet.description) + "</td><td>0 – 0</td><td>No scores yet</td></tr>"; return; }
+      var status = last.orig > 0 ? "Team 1 up " + last.orig + " on the original bet" : last.orig < 0 ? "Team 2 up " + (-last.orig) + " on the original bet" : "Original bet all square";
+      if (last.presses > 0) status += " · " + last.presses + " press" + (last.presses === 1 ? "" : "es") + " running";
+      out += "<tr><td>Bet " + bet.betNumber + ": " + esc(bet.description) + "</td><td>" + bet.total.t1 + " – " + bet.total.t2 + "</td><td>" + status + "</td></tr>";
+    });
+    out += "</table>";
+  }
+  var r = null;
+  try { r = eng.settle(18); } catch (e) { r = null; }
+  if (r) out += "<p class='team' style='font-weight:700'>If the round ended now: Team 1 " + money(r.team1Amt) + "/player · Team 2 " + money(r.team2Amt) + "/player</p>";
+  out += resultSummaryHtml(eng, "So far:");
+  box.innerHTML = out;
 }
 
 /* ================= save flow =================
@@ -2035,7 +2113,7 @@ function pastCard(rec, teamNo, pars) {
    summary is shown, say how the result was achieved — every settle
    category with its score on one line (ball bets, birdies, Team Par
    or Better, All Balls), from the engine's own settle rows. */
-function resultSummaryHtml(engine) {
+function resultSummaryHtml(engine, title) {
   if (!engine) return "";
   var r;
   try { r = engine.settle(18); } catch (e) { return ""; }
@@ -2044,7 +2122,7 @@ function resultSummaryHtml(engine) {
     var label = row.label.replace("Birdie bonus", "Birdies").replace("All balls", "All Balls");
     return esc(label) + " " + row.t1 + "–" + row.t2;
   });
-  return "<p class='note' style='margin-top:6px'><strong>How the result was achieved:</strong> " + parts.join(" · ") + "</p>";
+  return "<p class='note' style='margin-top:6px'><strong>" + (title || "How the result was achieved:") + "</strong> " + parts.join(" · ") + "</p>";
 }
 /* Rebuild an engine for a saved round (v7.5), so Past Rounds can
    show the same bet-by-bet audit as a live round. Stored games
