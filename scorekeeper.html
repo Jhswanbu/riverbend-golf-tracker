@@ -1262,6 +1262,7 @@ function renderRoundView() {
     var pe = pastEngine(rec, pars);
     box.innerHTML =
       "<p class='team' style='font-weight:700'>Saved round — Team 1 " + money(amts.t1) + "/player · Team 2 " + money(amts.t2) + "/player</p>" +
+      setupHtml(rec) +
       pastCard(rec, 1, pars) + pastCard(rec, 2, pars) +
       (pe ? auditHtml(pe) : "") +
       "<p class='note'>Everyone who picks this date sees this same round. Only an admin can adjust a past round (Admin tab, then Past Rounds).</p>";
@@ -1864,6 +1865,35 @@ function gameAmounts(rec) {
   if (t2 === null && rec.teams.team2.length && rec.moneyResults) t2 = rec.moneyResults[rec.teams.team2[0].id];
   return { t1: t1 == null ? 0 : t1, t2: t2 == null ? 0 : t2 };
 }
+/* Setup as played (v7.7): when a saved round is opened — from the
+   date view or from Past Rounds — show the setup stored WITH that
+   round (bets, amount, bonuses, All Balls holes, groups), never the
+   current entry's settings, so the setup on screen is the setup the
+   round was actually played under. Built only from the record;
+   fields an old record lacks simply drop out. */
+function setupHtml(rec) {
+  var st = rec.settings || {};
+  var bits = [];
+  if (st.betAmount) bits.push("$" + st.betAmount + " per bet");
+  if (st.betConfiguration && st.betConfiguration.length) {
+    bits.push("Bets: " + st.betConfiguration.map(function (bc) { return bc.description; }).join(" · "));
+  }
+  var bonus = [];
+  if (st.birdieBonus) bonus.push("Birdie bonus");
+  if (st.parOrBetterBonus) bonus.push("Team Par or Better");
+  if (st.allBalls) bonus.push("All Balls on holes " + [st.allBallsFront, st.allBallsBack].filter(Boolean).join(" & "));
+  if (bonus.length) bits.push(bonus.join(" · "));
+  var h = "<div style='border:1px solid #ccd;border-radius:8px;padding:8px 10px;margin:10px 0;font-size:.92em'>";
+  h += "<div style='font-weight:700;margin-bottom:2px'>Setup as played</div>";
+  if (bits.length) h += "<div>" + esc(bits.join(" — ")) + "</div>";
+  var nameOf = {};
+  ((rec.teams && rec.teams.team1) || []).concat((rec.teams && rec.teams.team2) || []).forEach(function (p) { nameOf[p.id] = p.name; });
+  (rec.groups || []).forEach(function (g) {
+    var names = (g.playerIds || []).map(function (id) { return nameOf[id]; }).filter(Boolean);
+    if (names.length) h += "<div>" + esc(g.name || ("Group " + g.id)) + (g.time ? " · " + esc(g.time) : "") + ": " + esc(names.join(", ")) + "</div>";
+  });
+  return h + "</div>";
+}
 function pastCard(rec, teamNo, pars) {
   var plist = teamNo === 1 ? rec.teams.team1 : rec.teams.team2;
   // Highlights (v2): ring birdies/eagles against THIS game's pars, and tint
@@ -1930,7 +1960,7 @@ function renderPast() {
     h += "<div class='pastitem' data-past='" + idx + "'><div class='ph'><span>" + esc(d) + "</span><span>" +
       rec.teams.team1.length + " v " + rec.teams.team2.length + "</span></div>" +
       "<div class='ph' style='font-weight:400'><span>Team 1 " + money(amts.t1) + "/player</span><span>Team 2 " + money(amts.t2) + "/player</span></div>" +
-      "<div class='pastbody' id='past-" + idx + "' style='display:none'>" + pastCard(rec, 1, pars) + pastCard(rec, 2, pars) +
+      "<div class='pastbody' id='past-" + idx + "' style='display:none'>" + setupHtml(rec) + pastCard(rec, 1, pars) + pastCard(rec, 2, pars) +
       (pe ? auditHtml(pe) : "") +
       // Admin removal (v7): Jon's safety net for open submission — anyone
       // can submit, an admin can back a bad round out. Editors only; the
