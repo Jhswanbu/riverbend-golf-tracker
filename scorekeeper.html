@@ -204,6 +204,7 @@
         <h2 style="margin-top:0">3 · Scores</h2>
         <p class="note" style="margin-top:0">Par row is editable — change it when the group plays a different course.</p>
         <div id="grids"></div>
+        <div id="gridMsg" class="msg" role="status"></div>
       </div>
 
       <div class="card" id="liveCard">
@@ -1634,8 +1635,23 @@ $("grids").addEventListener("change", function (ev) {
   if (t.hasAttribute("data-pid")) {
     var pid = Number(t.getAttribute("data-pid")), hole = Number(t.getAttribute("data-hole"));
     if (!S.entry.scores[pid]) S.entry.scores[pid] = Array(18).fill(null);
-    if (t.value === "") S.entry.scores[pid][hole] = null;
-    else { var n = parseInt(t.value, 10); S.entry.scores[pid][hole] = (isNaN(n) || n < 1) ? null : Math.min(n, 20); t.value = S.entry.scores[pid][hole] === null ? "" : S.entry.scores[pid][hole]; }
+    if (t.value === "") { S.entry.scores[pid][hole] = null; $("gridMsg").textContent = ""; $("gridMsg").className = "msg"; }
+    else {
+      var n = parseInt(t.value, 10);
+      var par = S.entry.pars[hole] || 4;
+      var max = 2 * par;
+      if (!isNaN(n) && n > max) {
+        /* Double-par cap (v9.1, Jon 2026-11-21): the maximum score on
+           a hole is double par — anything above is refused as an
+           error, the previous score stays, and the reason is shown. */
+        t.value = S.entry.scores[pid][hole] === null ? "" : S.entry.scores[pid][hole];
+        showMsg($("gridMsg"), "err", "Hole " + (hole + 1) + " is a par " + par + " — the most that can be entered is double par (" + max + "). The " + n + " wasn't entered.");
+        return;
+      }
+      S.entry.scores[pid][hole] = (isNaN(n) || n < 1) ? null : n;
+      t.value = S.entry.scores[pid][hole] === null ? "" : S.entry.scores[pid][hole];
+      $("gridMsg").textContent = ""; $("gridMsg").className = "msg";
+    }
     updateDerived();
   }
 });
@@ -2248,6 +2264,22 @@ $("btnConfirmRemove").addEventListener("click", async function () {
    against both real workbooks. */
 var upPayload = null;
 var upOffenders = [];
+var upOverCap = [];
+
+/* Double-par cap (v9.1, Jon 2026-11-21): the same rule as the entry
+   grids, applied to spreadsheet uploads — a score above double par
+   is an error and blocks the upload, with the cells listed.
+   (0 = hole not played; a missing par skips the hole.) */
+function overCapScores(rows, pars) {
+  var out = [];
+  (rows || []).forEach(function (r) {
+    (r.scores || []).forEach(function (v, i) {
+      var par = Number((pars || [])[i]) || 0;
+      if (v > 0 && par > 0 && v > 2 * par) out.push(r.name + " — hole " + (i + 1) + ": " + v + " on a par " + par + " (max " + (2 * par) + ")");
+    });
+  });
+  return out;
+}
 
 function cell(ws, ref) { var c = ws[ref]; return c ? c.v : undefined; }
 function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
@@ -2415,6 +2447,10 @@ function showUploadPreview(p) {
     html += "<p class='blockerr'>⛔ <strong>Cannot submit — these players are not on the Name List tab:</strong> " +
       upOffenders.map(esc).join(", ") + ". Add them to the Name List first (or fix the name), save, and pick the file again.</p>";
   }
+  if (upOverCap.length) {
+    html += "<p class='blockerr'>⛔ <strong>Cannot submit — scores above double par:</strong> " +
+      upOverCap.map(esc).join("; ") + ". The maximum score on a hole is double par — fix the score in the spreadsheet, save, and pick the file again.</p>";
+  }
   // History highlight: app players with scoring history who are absent
   // from this file (checked against its Name List + game rows). Uses this
   // app's loaded roster (S.players); non-blocking — submit stays enabled.
@@ -2446,7 +2482,7 @@ $("upFile").addEventListener("change", function (e) {
   var btn = $("upSubmit"), res = $("upResult");
   res.className = "msg"; res.textContent = "";
   btn.disabled = true; btn.textContent = "Submit round";
-  upPayload = null; upOffenders = [];
+  upPayload = null; upOffenders = []; upOverCap = [];
   $("upPreview").innerHTML = "";
   if (!f) return;
   if (typeof XLSX === "undefined") {
@@ -2457,8 +2493,9 @@ $("upFile").addEventListener("change", function (e) {
     var wb = XLSX.read(buf, { type: "array", cellDates: true });
     upPayload = buildPayload(wb);
     upOffenders = nameListCheck(wb, upPayload.rows);
+    upOverCap = overCapScores(upPayload.rows, upPayload.settings.pars);
     showUploadPreview(upPayload);
-    btn.disabled = upOffenders.length > 0;
+    btn.disabled = upOffenders.length > 0 || upOverCap.length > 0;
   }).catch(function (err) {
     showMsg(res, "err", "Could not read that file: " + err.message);
   });
@@ -2469,6 +2506,10 @@ $("upSubmit").addEventListener("click", function () {
   var btn = this, res = $("upResult");
   if (upOffenders.length) {
     showMsg(res, "err", "Not submitted — these players are not on the Name List tab: " + upOffenders.join(", ") + ". Add them to the Name List first.");
+    return;
+  }
+  if (upOverCap.length) {
+    showMsg(res, "err", "Not submitted — scores above double par: " + upOverCap.join("; ") + ". Fix them in the spreadsheet first.");
     return;
   }
   btn.disabled = true; btn.textContent = "Submitting…";
