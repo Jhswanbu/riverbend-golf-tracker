@@ -46,6 +46,9 @@
   .tabs { display: flex; gap: 8px; margin: 14px 0 4px; }
   .tabs button { flex: 1; min-height: 48px; margin-top: 0; background: #e3eae3; color: #14532d; }
   .tabs button.on { background: #14532d; color: #fff; }
+  /* home screen (v8): three big options; .navrow is each view's back-links row */
+  .homebtn { display: block; width: 100%; margin: 10px 0; padding: 16px; font-size: 1.15rem; min-height: 60px; }
+  .navrow { margin: 4px 0 10px; }
   .who { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .who .em { font-size: .9rem; color: #445; overflow: hidden; text-overflow: ellipsis; }
   /* roster */
@@ -124,18 +127,7 @@
   <h1>⛳ Riverbend Scorekeeper</h1>
   <p class="note">The whole field's scores, entered like the spreadsheet. <strong>Anyone can enter and submit a round — no login needed</strong>; it counts right away, and an admin is alerted for every submission. No live scoring.</p>
 
-  <!-- ROUND BY DATE (v7.6, Jon 2026-11-20): the page opens by asking
-       which date you are looking for, and every visitor sees the same
-       data for that date's round — saved rounds are public and
-       read-only here. The admin sign-in moved to its own tab; only
-       admins can adjust a past round. -->
-  <div class="card" id="dateCard">
-    <h2 style="margin-top:0">Which date are you looking for?</h2>
-    <input type="date" id="roundDate">
-    <div id="roundView" style="margin-top:10px"><p class="note">Loading…</p></div>
-  </div>
-
-  <!-- APP SHELL (always present in v7; signed-out visitors get the open tabs) -->
+  <!-- APP SHELL (always present in v7; signed-out visitors get the open views) -->
   <div id="appShell">
     <div class="card" id="draftBar" style="padding:10px 16px;display:none">
       <div class="who">
@@ -146,17 +138,23 @@
     <div id="roNote"></div>
     <div id="saveOk" class="msg ok" role="status" style="margin:12px 0"></div>
 
-    <div class="tabs">
-      <button id="tabEnter" class="on">Enter Scores</button>
-      <button id="tabUpload">Upload Spreadsheet</button>
-      <button id="tabSetup">Setup Card</button>
-      <button id="tabTally">Season Tally</button>
-      <button id="tabPast">Past Rounds</button>
-      <button id="tabAdmin">Admin</button>
-    </div>
+    <!-- HOME (v8, Jon 2026-11-20): the page starts with three options —
+         New round, View Previous Round, Season Tally. The tab bar is
+         gone; every view carries a Home link back here, and the Admin
+         sign-in is its own page, linked from the Previous Round and
+         Season Tally views. -->
+    <section id="viewHome">
+      <div class="card" style="text-align:center">
+        <h2 style="margin-top:0">What would you like to do?</h2>
+        <button class="homebtn" data-goto="enter">New round</button>
+        <button class="homebtn secondary" data-goto="previous">View Previous Round</button>
+        <button class="homebtn secondary" data-goto="tally">Season Tally</button>
+      </div>
+    </section>
 
-    <!-- ENTER SCORES -->
-    <section id="viewEnter">
+    <!-- ENTER SCORES (New round) -->
+    <section id="viewEnter" style="display:none">
+      <p class="navrow"><button class="secondary small" data-goto="home">← Home</button> <button class="secondary small" data-goto="upload">Upload spreadsheet instead</button> <button class="secondary small" data-goto="setup">Setup card</button></p>
       <div class="card" id="enterSetupCard">
         <h2 style="margin-top:0">1 · Setup</h2>
         <label class="f" for="inDate">Round date</label>
@@ -210,6 +208,7 @@
 
     <!-- UPLOAD SPREADSHEET -->
     <section id="viewUpload" style="display:none">
+      <p class="navrow"><button class="secondary small" data-goto="home">← Home</button> <button class="secondary small" data-goto="enter">Back to score entry</button></p>
       <h2>Upload Spreadsheet</h2>
       <div class="card" style="margin-top:0">
         <p class="note" style="margin-top:0"><strong>First:</strong> in Excel, enter the scores and <strong>Save the file</strong> (so the totals are written), then pick that saved file here. On an iPad, work from the plain <strong>.xlsx</strong> copy — saving an .xlsm from iPad Excel strips its macros (and its desktop button), so never save over the .xlsm master.</p>
@@ -225,6 +224,7 @@
 
     <!-- SETUP CARD -->
     <section id="viewSetup" style="display:none">
+      <p class="navrow"><button class="secondary small" data-goto="home">← Home</button> <button class="secondary small" data-goto="enter">Back to score entry</button></p>
       <h2>Setup Card</h2>
       <p class="note">The day's setup on one clean card — teams, groups, bets, and the All Balls holes. Take a picture of it to share with the group.</p>
       <div id="setupCard"></div>
@@ -232,24 +232,39 @@
 
     <!-- SEASON TALLY -->
     <section id="viewTally" style="display:none">
+      <p class="navrow"><button class="secondary small" data-goto="home">← Home</button></p>
       <h2>Season Tally</h2>
       <div class="card" style="margin-top:0"><div id="tally"></div></div>
+      <p class="note" style="margin-top:16px">Admins can adjust past rounds — <a href="#" data-goto="admin">Admin sign-in →</a></p>
     </section>
 
-    <!-- PAST ROUNDS -->
+    <!-- PREVIOUS ROUND (v8): pick a date and see that round's scores
+         and bet data, read-only — the same round for every visitor
+         (guest_round_by_date). The full past-rounds list below it is
+         signed-in only and carries the admin Remove flow. The Admin
+         sign-in is linked at the bottom. -->
     <section id="viewPast" style="display:none">
+      <p class="navrow"><button class="secondary small" data-goto="home">← Home</button></p>
+      <div class="card" id="dateCard">
+        <h2 style="margin-top:0">Which date are you looking for?</h2>
+        <input type="date" id="roundDate">
+        <div id="roundView" style="margin-top:10px"><p class="note">Loading…</p></div>
+      </div>
       <h2>Past Rounds</h2>
       <div id="pastList"></div>
+      <p class="note" style="margin-top:16px">Admins can adjust past rounds — <a href="#" data-goto="admin">Admin sign-in →</a></p>
     </section>
 
-    <!-- ADMIN (v7.6): the sign-in lives on its own tab. Signing in is
-         only for adjusting past rounds and adding players — viewing a
-         round and entering scores never need a login. -->
+    <!-- ADMIN (v8): its own page, linked from the Previous Round and
+         Season Tally views. Signing in is only for adjusting past
+         rounds and adding players — viewing a round and entering
+         scores never need a login. -->
     <section id="viewAdmin" style="display:none">
+      <p class="navrow"><button class="secondary small" data-goto="home">← Home</button></p>
       <h2>Admin</h2>
       <div id="adminCard" class="card" style="display:none">
         <h3 style="margin-top:0">Admin sign-in</h3>
-        <p class="note" style="margin-top:0">Admins and scorekeepers sign in to <strong>adjust past rounds</strong> (Past Rounds tab) and <strong>add players</strong>. Everyone else never needs this — pick a date at the top to see a round, or enter scores on the Enter Scores tab.</p>
+        <p class="note" style="margin-top:0">Admins and scorekeepers sign in to <strong>adjust past rounds</strong> (Previous Round section) and <strong>add players</strong>. Everyone else never needs this — view a previous round or enter scores from the home screen.</p>
         <label class="f" for="liEmail">Email</label>
         <input type="email" id="liEmail" autocomplete="username" placeholder="you@example.com">
         <label class="f" for="liPass">Password</label>
@@ -773,7 +788,7 @@ var S = {
   user: null, role: null, canEdit: false,
   players: [],          // rowToPlayer-shaped, alphabetical
   games: [],            // raw games rows, newest first
-  view: "enter",
+  view: "home",
   entry: null
 };
 function freshEntry() {
@@ -1108,10 +1123,10 @@ function allScoresIn() {
    they can view the Setup Card (Jon, 2026-11-10: non-admins get the
    round setup card too). */
 function setAdminTabs() {
-  var signedIn = !!S.user;
-  $("tabSetup").style.display = "";
-  $("tabPast").style.display = signedIn ? "" : "none";
-  if (!signedIn && S.view === "past") switchView("enter");
+  /* v8: there is no tab bar to gate anymore — the home screen is the
+     navigation, and the Previous Round view is public (its list is
+     simply empty signed out, with a note). Kept as a no-op so the
+     session flow's calls stay valid. */
 }
 function applySession(session) {
   if (session && session.user) {
@@ -1190,31 +1205,33 @@ $("btnDiscardDraft").addEventListener("click", function () {
   showMsg($("saveOk"), "ok", "Saved setup discarded — starting fresh.");
 });
 
-/* ================= tabs ================= */
+/* ================= navigation (v8) =================
+   The tab bar is gone: the page starts on a home screen with three
+   options (New round / View Previous Round / Season Tally), every
+   view links back Home, and the Admin sign-in is its own page linked
+   from the Previous Round and Season Tally views. All navigation
+   goes through data-goto attributes and one delegated handler, so
+   dynamically rendered links (renderPast, renderRoundView) work too. */
 function switchView(v) {
   S.view = v;
+  $("viewHome").style.display = v === "home" ? "" : "none";
   $("viewEnter").style.display = v === "enter" ? "" : "none";
   $("viewUpload").style.display = v === "upload" ? "" : "none";
   $("viewSetup").style.display = v === "setup" ? "" : "none";
   $("viewTally").style.display = v === "tally" ? "" : "none";
-  $("viewPast").style.display = v === "past" ? "" : "none";
+  $("viewPast").style.display = v === "previous" ? "" : "none";
   $("viewAdmin").style.display = v === "admin" ? "" : "none";
-  $("tabEnter").className = v === "enter" ? "on" : "";
-  $("tabUpload").className = v === "upload" ? "on" : "";
-  $("tabSetup").className = v === "setup" ? "on" : "";
-  $("tabTally").className = v === "tally" ? "on" : "";
-  $("tabPast").className = v === "past" ? "on" : "";
-  $("tabAdmin").className = v === "admin" ? "on" : "";
   if (v === "setup") renderSetupCard();
   if (v === "tally") renderTally();
-  if (v === "past") renderPast();
+  if (v === "previous") renderPast();
+  window.scrollTo(0, 0);
 }
-$("tabEnter").addEventListener("click", function () { switchView("enter"); });
-$("tabUpload").addEventListener("click", function () { switchView("upload"); });
-$("tabSetup").addEventListener("click", function () { switchView("setup"); });
-$("tabTally").addEventListener("click", function () { switchView("tally"); });
-$("tabPast").addEventListener("click", function () { switchView("past"); });
-$("tabAdmin").addEventListener("click", function () { switchView("admin"); });
+document.addEventListener("click", function (ev) {
+  var t = ev.target.closest("[data-goto]");
+  if (!t) return;
+  ev.preventDefault();
+  switchView(t.getAttribute("data-goto"));
+});
 
 /* ================= round by date (v7.6) =================
    Jon (2026-11-20): the page opens by asking which date you are
@@ -1256,14 +1273,6 @@ function renderRoundView() {
   var ds = ($("roundDate") && $("roundDate").value) || todayChicago();
   var rec = findRound(ds);
   if (rec === undefined) { box.innerHTML = "<p class='note'>Loading that round…</p>"; return; }
-  /* Previous rounds (v7.8, Jon 2026-11-20): while a saved round is on
-     screen at the top, the Enter Scores setup sections below (1 · Setup,
-     2 · Bets & settings) belong to a NEW round and don't match the round
-     being viewed — hide them. They come back for a date with no saved
-     round. The Admin and Season Tally tabs are untouched. */
-  var setupDisplay = rec ? "none" : "";
-  if ($("enterSetupCard")) $("enterSetupCard").style.display = setupDisplay;
-  if ($("enterBetsCard")) $("enterBetsCard").style.display = setupDisplay;
   if (rec) {
     var pars = rec.breakdown && Array.isArray(rec.breakdown.pars) && rec.breakdown.pars.length === 18 ? rec.breakdown.pars : DEFAULT_PARS;
     var amts = gameAmounts(rec);
@@ -1273,7 +1282,7 @@ function renderRoundView() {
       setupHtml(rec) +
       pastCard(rec, 1, pars) + pastCard(rec, 2, pars) +
       (pe ? auditHtml(pe) : "") +
-      "<p class='note'>Everyone who picks this date sees this same round. Only an admin can adjust a past round (Admin tab, then Past Rounds).</p>";
+      "<p class='note'>Everyone who picks this date sees this same round. Only an admin can adjust a past round (Admin sign-in link at the bottom of this page).</p>";
     return;
   }
   if (S.entry.date === ds) {
@@ -1957,7 +1966,7 @@ function pastEngine(rec, pars) {
   } catch (e) { return null; }
 }
 function renderPast() {
-  if (!S.games.length) { $("pastList").innerHTML = "<p class='note'>No saved rounds yet.</p>"; return; }
+  if (!S.games.length) { $("pastList").innerHTML = S.user ? "<p class='note'>No saved rounds yet.</p>" : "<p class='note'>Pick a date above to see that round. The full list of past rounds is for signed-in admins — use the Admin sign-in link at the bottom of this page.</p>"; return; }
   var h = "";
   S.games.forEach(function (g, idx) {
     var rec = gameRowToRecord(g);
@@ -2042,7 +2051,7 @@ $("btnConfirmRemove").addEventListener("click", async function () {
   await loadAll();
   delete roundCache[d];
   renderRoundView();
-  switchView("past");
+  switchView("previous");
   showMsg($("saveOk"), "ok", "Round for " + d + " removed — season totals backed out.");
   window.scrollTo(0, 0);
 });
