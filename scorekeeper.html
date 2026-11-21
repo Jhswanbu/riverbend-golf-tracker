@@ -95,6 +95,21 @@
   table.grid td.abwin { background: #bdd7ee; color: #1f4e79; font-weight: 700; }
   table.grid td.ablose { background: #ffc7ce; color: #9c0006; font-weight: 700; }
   table.grid tr.abrow td { font-weight: 700; }
+  /* landscape phones (v9.3, Jon 2026-11-21): when the phone turns,
+     the page lays out for the wide screen — full width instead of
+     the 880px column, tighter cards, smaller score cells so more
+     holes fit across, and the home buttons in a row. Portrait keeps
+     the stacked layout above. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    body { padding: 8px; }
+    main { max-width: none; }
+    .card { padding: 10px 12px; margin: 8px 0; }
+    h1 { font-size: 1.25rem; }
+    .homebtn { display: inline-block; width: 32.3%; margin: 6px 0.5% 6px 0; vertical-align: top; }
+    table.grid { min-width: 700px; }
+    table.grid input { width: 36px; padding: 6px 1px; }
+    table.grid input.par { width: 36px; }
+  }
   .circ { display: inline-block; min-width: 25px; line-height: 25px; padding: 0 2px; border: 2px solid #b8860b; border-radius: 50%; text-align: center; font-weight: 700; }
   .circ.eag { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #b8860b; }
   /* setup card (v2): a clean, shareable picture of the day's setup */
