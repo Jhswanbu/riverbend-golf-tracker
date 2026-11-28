@@ -1830,25 +1830,31 @@ function auditHtml(engine) {
   /* By-nine breakdown (v9.2, Jon 2026-11-21): how the bets stand for
      every nine — each category's front-nine score, back-nine score
      (the full settle minus the front), and total, from the engine's
-     own settle(9) / settle(18). Money columns added v9.6 (Jon
-     2026-11-27): beside every nine's bet count, the money each team
-     won on that nine for that bet — bets won times the bet amount,
-     shown Team 1 – Team 2, matching the workbook's Audit tab. */
+     own settle(9) / settle(18). Net-only display (v9.7, Jon
+     2026-11-27): each nine shows just the net — the leading team,
+     how many bets it is up, and the money it is up (net bets times
+     the bet amount); a level nine reads All square. Matches the
+     workbook's Audit tab. */
   var s9 = null, s18 = null;
   try { s9 = engine.settle(9); s18 = engine.settle(18); } catch (e) { s9 = null; s18 = null; }
   if (s9 && s18 && s18.rows.length) {
     var front = {};
     var amt = s18.betAmount || 0;
     var fmt = function (v) { return (v < 0 ? "-$" : "$") + Math.abs(v).toFixed(2); };
-    var mny = function (a, b) { return fmt(a * amt) + " – " + fmt(b * amt); };
+    var net = function (a, b) {
+      var d = a - b;
+      if (d === 0) return "All square";
+      var n = Math.abs(d);
+      return (d > 0 ? "Team 1" : "Team 2") + " up " + n + (n === 1 ? " bet" : " bets") + " (" + fmt(n * amt) + ")";
+    };
     s9.rows.forEach(function (r) { front[r.label] = r; });
-    h += "<h4>How the bets stand by nine</h4><div class='scroll'><table class='audittable'><tr><th>Bet</th><th>Front 9</th><th>Front 9 $</th><th>Back 9</th><th>Back 9 $</th><th>Total</th><th>Total $</th></tr>";
+    h += "<h4>How the bets stand by nine</h4><div class='scroll'><table class='audittable'><tr><th>Bet</th><th>Front 9</th><th>Back 9</th><th>Total</th></tr>";
     s18.rows.forEach(function (r) {
       var f = front[r.label] || { t1: 0, t2: 0 };
       var label = r.label.replace("Birdie bonus", "Birdies").replace("All balls", "All Balls");
-      h += "<tr><td>" + esc(label) + "</td><td>" + f.t1 + " – " + f.t2 + "</td><td>" + mny(f.t1, f.t2) + "</td><td>" + (r.t1 - f.t1) + " – " + (r.t2 - f.t2) + "</td><td>" + mny(r.t1 - f.t1, r.t2 - f.t2) + "</td><td>" + r.t1 + " – " + r.t2 + "</td><td>" + mny(r.t1, r.t2) + "</td></tr>";
+      h += "<tr><td>" + esc(label) + "</td><td>" + net(f.t1, f.t2) + "</td><td>" + net(r.t1 - f.t1, r.t2 - f.t2) + "</td><td>" + net(r.t1, r.t2) + "</td></tr>";
     });
-    h += "<tr class='audittotal'><td>All bets</td><td>" + s9.t1Bets + " – " + s9.t2Bets + "</td><td>" + mny(s9.t1Bets, s9.t2Bets) + "</td><td>" + (s18.t1Bets - s9.t1Bets) + " – " + (s18.t2Bets - s9.t2Bets) + "</td><td>" + mny(s18.t1Bets - s9.t1Bets, s18.t2Bets - s9.t2Bets) + "</td><td>" + s18.t1Bets + " – " + s18.t2Bets + "</td><td>" + mny(s18.t1Bets, s18.t2Bets) + "</td></tr></table></div>";
+    h += "<tr class='audittotal'><td>All bets</td><td>" + net(s9.t1Bets, s9.t2Bets) + "</td><td>" + net(s18.t1Bets - s9.t1Bets, s18.t2Bets - s9.t2Bets) + "</td><td>" + net(s18.t1Bets, s18.t2Bets) + "</td></tr></table></div>";
   }
   a.bets.forEach(function (bet) {
     h += "<h4>Bet " + bet.betNumber + ": " + esc(bet.description) + " — Team 1 " + bet.total.t1 + " – " + bet.total.t2 + " Team 2</h4>";
